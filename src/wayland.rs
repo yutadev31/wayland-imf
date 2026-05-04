@@ -137,17 +137,17 @@ impl Dispatch<zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2, (
                             }
 
                             if state.ime.commit_pending {
-                                let buf = state.ime.preedit_buf.clone();
+                                let buf = state.ime.preedit_kana.clone();
                                 im.commit_string(buf);
-                                state.ime.preedit_buf.clear();
+                                state.ime.preedit_raw.clear();
+                                state.ime.preedit_kana.clear();
                                 state.ime.commit_pending = false;
-                                state.ime.cursor = 0;
                             }
 
                             im.set_preedit_string(
-                                state.ime.preedit_buf.clone(),
-                                state.ime.cursor.into(),
-                                state.ime.cursor.into(),
+                                state.ime.preedit_kana.clone(),
+                                state.ime.preedit_kana.len().try_into().unwrap(),
+                                state.ime.preedit_kana.len().try_into().unwrap(),
                             );
 
                             im.commit(0);
