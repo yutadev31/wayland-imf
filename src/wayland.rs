@@ -100,10 +100,16 @@ impl Dispatch<zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2, (
         _qhandle: &QueueHandle<Self>,
     ) {
         match event {
-            zwp_input_method_keyboard_grab_v2::Event::Keymap {  fd, size , ..} => {
+            zwp_input_method_keyboard_grab_v2::Event::Keymap { fd, size, .. } => {
                 handle_keymap(fd, size, &mut state.kb);
             }
-            zwp_input_method_keyboard_grab_v2::Event::Modifiers { mods_depressed, mods_latched, mods_locked, group, .. } => {
+            zwp_input_method_keyboard_grab_v2::Event::Modifiers {
+                mods_depressed,
+                mods_latched,
+                mods_locked,
+                group,
+                ..
+            } => {
                 handle_modifiers(
                     &mut state.kb,
                     mods_depressed,
@@ -112,36 +118,45 @@ impl Dispatch<zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2, (
                     group,
                 );
             }
-            wayland_protocols_misc::zwp_input_method_v2::client::zwp_input_method_keyboard_grab_v2::Event::Key {
+            zwp_input_method_keyboard_grab_v2::Event::Key {
                 key,
                 state: key_state,
                 ..
-            } => {
-                match key_state {
-                    wayland_client::WEnum::Value(key_state) => {
-                        match key_state {
-                            wayland_client::protocol::wl_keyboard::KeyState::Pressed => {
-                                println!("key pressed: {}", key);
+            } => match key_state {
+                wayland_client::WEnum::Value(key_state) => match key_state {
+                    wayland_client::protocol::wl_keyboard::KeyState::Pressed => {
+                        println!("key pressed: {}", key);
 
-                                handle_key(&mut state.kb, key, &mut state.ime);
+                        handle_key(&mut state.kb, key, &mut state.ime);
 
-                                if let Some(im) = &state.input_method {
-                                    im.set_preedit_string(state.ime.buffer.clone(), state.ime.cursor.into(), state.ime.cursor.into());
-
-                                    if state.ime.commit_pending {
-                                        let buf = state.ime.buffer.clone();
-                                        im.commit_string(buf);
-                                    }
-
-                                    im.commit(0);
-                                }
+                        if let Some(im) = &state.input_method {
+                            if !state.ime.commit_buf.is_empty() {
+                                let buf = state.ime.commit_buf.clone();
+                                im.commit_string(buf);
+                                state.ime.commit_buf.clear();
                             }
-                            _ => {}
+
+                            if state.ime.commit_pending {
+                                let buf = state.ime.preedit_buf.clone();
+                                im.commit_string(buf);
+                                state.ime.preedit_buf.clear();
+                                state.ime.commit_pending = false;
+                                state.ime.cursor = 0;
+                            }
+
+                            im.set_preedit_string(
+                                state.ime.preedit_buf.clone(),
+                                state.ime.cursor.into(),
+                                state.ime.cursor.into(),
+                            );
+
+                            im.commit(0);
                         }
                     }
                     _ => {}
-                }
-            }
+                },
+                _ => {}
+            },
             _ => {}
         }
     }

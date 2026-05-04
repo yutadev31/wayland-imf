@@ -1,22 +1,23 @@
 #[derive(Debug, Default)]
 pub struct ImeState {
-    pub buffer: String,
+    pub preedit_buf: String,
+    pub commit_buf: String,
     pub cursor: u16,
     pub commit_pending: bool,
 }
 
 impl ImeState {
     pub fn input_char(&mut self, text: String) {
-        self.buffer.push_str(&text);
+        self.preedit_buf.push_str(&text);
         self.cursor += 1;
     }
 
     pub fn backspace(&mut self) {
-        if self.buffer.is_empty() {
+        if self.preedit_buf.is_empty() {
             return;
         }
 
-        self.buffer.pop();
+        self.preedit_buf.pop();
         self.cursor -= 1;
     }
 
@@ -25,7 +26,7 @@ impl ImeState {
     }
 
     pub fn space(&mut self) {
-        if self.buffer.is_empty() {
+        if self.preedit_buf.is_empty() {
             self.input_char(" ".into());
             return;
         }
