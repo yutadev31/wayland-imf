@@ -52,9 +52,9 @@ pub fn handle_key(kb: &mut KbState, key: u32, ime: &mut ImeState) {
             xkb::Keysym::Return => {
                 ime.enter();
             }
-            // xkb::Keysym::Zenkaku_Hankaku => {
-            //     ime.switch_mode();
-            // }
+            xkb::Keysym::Zenkaku_Hankaku => {
+                ime.switch_mode();
+            }
             _ => {
                 let text = state.key_get_utf8(keycode);
                 if !text.is_empty() && !text.chars().any(|c| c.is_control()) {

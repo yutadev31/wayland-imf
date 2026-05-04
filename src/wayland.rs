@@ -61,8 +61,8 @@ impl Dispatch<wl_seat::WlSeat, ()> for State {
 
 impl Dispatch<zwp_input_method_v2::ZwpInputMethodV2, ()> for State {
     fn event(
-        state: &mut Self,
-        proxy: &zwp_input_method_v2::ZwpInputMethodV2,
+        _state: &mut Self,
+        _proxy: &zwp_input_method_v2::ZwpInputMethodV2,
         event: <zwp_input_method_v2::ZwpInputMethodV2 as wayland_client::Proxy>::Event,
         _data: &(),
         _conn: &Connection,
@@ -71,7 +71,6 @@ impl Dispatch<zwp_input_method_v2::ZwpInputMethodV2, ()> for State {
         match event {
             zwp_input_method_v2::Event::Activate => {
                 println!("IME activated");
-                state.keyboard_grab = Some(proxy.grab_keyboard(qh, ()));
             }
             _ => {}
         }
@@ -97,7 +96,7 @@ impl Dispatch<zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2, (
         event: <zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2 as wayland_client::Proxy>::Event,
         _data: &(),
         _conn: &Connection,
-        _qhandle: &QueueHandle<Self>,
+        qh: &QueueHandle<Self>,
     ) {
         match event {
             zwp_input_method_keyboard_grab_v2::Event::Keymap { fd, size, .. } => {
@@ -130,6 +129,17 @@ impl Dispatch<zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2, (
                         handle_key(&mut state.kb, key, &mut state.ime);
 
                         if let Some(im) = &state.input_method {
+                            if let None = state.keyboard_grab
+                                && state.ime.ime_enabled
+                            {
+                                state.keyboard_grab = Some(im.grab_keyboard(qh, ()));
+                            } else if let Some(keyboard_grab) = &mut state.keyboard_grab
+                                && !state.ime.ime_enabled
+                            {
+                                keyboard_grab.release();
+                                state.keyboard_grab = None;
+                            }
+
                             if !state.ime.commit_buf.is_empty() {
                                 let buf = state.ime.commit_buf.clone();
                                 im.commit_string(buf);

@@ -151,12 +151,17 @@ pub struct ImeState {
     pub preedit_kana: String,
     pub commit_buf: String,
     pub commit_pending: bool,
+    pub ime_enabled: bool,
 }
 
 impl ImeState {
     pub fn input_char(&mut self, text: String) {
-        self.preedit_raw.push_str(&text);
-        self.recompute();
+        if self.ime_enabled {
+            self.preedit_raw.push_str(&text);
+            self.recompute();
+        } else {
+            self.commit_buf.push_str(&text);
+        }
     }
 
     pub fn backspace(&mut self) {
@@ -179,6 +184,14 @@ impl ImeState {
         }
 
         // TODO 変換処理
+    }
+
+    pub fn switch_mode(&mut self) {
+        self.ime_enabled = !self.ime_enabled;
+
+        if self.ime_enabled {
+            self.commit_pending = true;
+        }
     }
 
     pub fn recompute(&mut self) {
