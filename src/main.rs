@@ -14,14 +14,14 @@ fn main() {
 
     event_queue.roundtrip(&mut state).unwrap();
 
-    if let (Some(seat), Some(im_manager)) = (&state.seat, &state.im_manager) {
+    if let (Some(seat), Some(im_manager)) = (&state.wayland.seat, &state.wayland.im_manager) {
         let im = im_manager.get_input_method(seat, &qh, ());
-        state.input_method = Some(im);
+        state.wayland.input_method = Some(im);
     }
 
-    if let (Some(seat), Some(vk_manager)) = (&state.seat, &state.vk_manager) {
+    if let (Some(seat), Some(vk_manager)) = (&state.wayland.seat, &state.wayland.vk_manager) {
         let vk = vk_manager.create_virtual_keyboard(seat, &qh, ());
-        state.virtual_keyboard = Some(vk);
+        state.wayland.virtual_keyboard = Some(vk);
     }
 
     loop {

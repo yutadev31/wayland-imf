@@ -1,5 +1,6 @@
 use std::os::fd::OwnedFd;
 
+use wayland_protocols_misc::zwp_virtual_keyboard_v1::client::zwp_virtual_keyboard_v1;
 use xkbcommon::xkb;
 
 use crate::ime::ImeState;
@@ -36,28 +37,21 @@ pub fn handle_modifiers(kb: &mut KbState, depressed: u32, latched: u32, locked: 
     }
 }
 
-pub fn handle_key(kb: &mut KbState, key: u32, ime: &mut ImeState) {
+pub fn handle_key(kb: &mut KbState, key: u32, ime: &mut ImeState) -> bool {
     if let Some(state) = &kb.state {
         let keycode = xkb::Keycode::new(key + 8);
 
         let sym = state.key_get_one_sym(keycode);
-
-        if !ime.ime_enabled {
-            if let xkb::Keysym::Zenkaku_Hankaku = sym {
-                ime.switch_mode();
-            }
-            return;
-        }
 
         match sym {
             xkb::Keysym::space => {
                 ime.space();
             }
             xkb::Keysym::BackSpace => {
-                ime.backspace();
+                return ime.backspace();
             }
             xkb::Keysym::Return => {
-                ime.enter();
+                return ime.enter();
             }
             xkb::Keysym::Zenkaku_Hankaku => {
                 ime.switch_mode();
@@ -65,9 +59,11 @@ pub fn handle_key(kb: &mut KbState, key: u32, ime: &mut ImeState) {
             _ => {
                 let text = state.key_get_utf8(keycode);
                 if !text.is_empty() && !text.chars().any(|c| c.is_control()) {
-                    ime.input_char(text);
+                    return ime.input_char(text);
                 }
             }
         }
     }
+
+    return false;
 }

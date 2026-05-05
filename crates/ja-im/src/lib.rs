@@ -1,0 +1,115 @@
+use std::collections::HashMap;
+
+use ime_core::{Context, InputMethod};
+
+mod romaji;
+
+fn is_vowel(c: char) -> bool {
+    matches!(c, 'a' | 'i' | 'u' | 'e' | 'o')
+}
+
+fn is_consonant(c: char) -> bool {
+    c.is_ascii_alphabetic() && !is_vowel(c) && c != 'n'
+}
+
+fn to_kana(table: &HashMap<&'static str, &'static str>, input: &str) -> String {
+    let chars: Vec<char> = input.chars().collect();
+    let mut i = 0;
+    let mut result = String::new();
+
+    while i < chars.len() {
+        let mut matched: Option<(usize, &str)> = None;
+
+        // =========================
+        // ① n（ん）処理
+        // =========================
+        if chars[i] == 'n' {
+            if i + 1 < chars.len() {
+                let next = chars[i + 1];
+
+                // nn → ん
+                if next == 'n' {
+                    result.push('ん');
+                    i += 2;
+                    continue;
+                }
+
+                // n + 子音 → ん
+                if !is_vowel(next) && next != 'y' {
+                    result.push('ん');
+                    i += 1;
+                    continue;
+                }
+            } else {
+                result.push('ん');
+                i += 1;
+                continue;
+            }
+        }
+
+        // =========================
+        // ② 促音（っ）処理
+        // =========================
+        if i + 1 < chars.len() {
+            let c1 = chars[i];
+            let c2 = chars[i + 1];
+
+            if c1 == c2 && is_consonant(c1) {
+                result.push('っ');
+                i += 1;
+                continue;
+            }
+        }
+
+        // =========================
+        // ③ ローマ字辞書変換（最長一致）
+        // =========================
+        for len in (1..=4).rev() {
+            if i + len > chars.len() {
+                continue;
+            }
+
+            let slice: String = chars[i..i + len].iter().collect();
+
+            if let Some(&kana) = table.get(slice.as_str()) {
+                matched = Some((len, kana));
+                break;
+            }
+        }
+
+        if let Some((len, kana)) = matched {
+            result.push_str(kana);
+            i += len;
+        } else {
+            // 未変換はそのまま
+            result.push(chars[i]);
+            i += 1;
+        }
+    }
+
+    result
+}
+
+#[derive(Debug)]
+pub struct JapaneseInputMethod {
+    romaji_table: HashMap<&'static str, &'static str>,
+}
+
+impl Default for JapaneseInputMethod {
+    fn default() -> Self {
+        Self {
+            romaji_table: romaji::romaji_table(),
+        }
+    }
+}
+
+impl InputMethod for JapaneseInputMethod {
+    fn on_input_str(&mut self, ctx: &mut Context, text: String) -> bool {
+        let mut buf = ctx.preedit_buf.clone();
+        buf.push_str(&text);
+
+        let buf = to_kana(&self.romaji_table, &buf);
+        ctx.set_preedit(buf);
+        return true;
+    }
+}
