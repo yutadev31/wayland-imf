@@ -2,7 +2,7 @@ use std::os::fd::{AsRawFd, BorrowedFd};
 
 use wayland_client::{
     Connection, Dispatch, QueueHandle,
-    protocol::{wl_compositor, wl_keyboard::KeymapFormat, wl_registry, wl_seat, wl_surface},
+    protocol::{wl_compositor, wl_registry, wl_seat, wl_surface},
 };
 use wayland_protocols::xdg::shell::client::xdg_wm_base;
 use wayland_protocols_misc::{
@@ -11,7 +11,6 @@ use wayland_protocols_misc::{
     },
     zwp_virtual_keyboard_v1::client::{zwp_virtual_keyboard_manager_v1, zwp_virtual_keyboard_v1},
 };
-use xkbcommon::xkb::KEYMAP_FORMAT_TEXT_V1;
 
 use crate::{
     keyboard::{handle_key, handle_keymap, handle_modifiers},
@@ -98,12 +97,12 @@ impl Dispatch<wl_compositor::WlCompositor, ()> for State {
 
 impl Dispatch<wl_surface::WlSurface, ()> for State {
     fn event(
-        state: &mut Self,
-        proxy: &wl_surface::WlSurface,
-        event: wl_surface::Event,
-        data: &(),
-        conn: &Connection,
-        qhandle: &QueueHandle<Self>,
+        _state: &mut Self,
+        _proxy: &wl_surface::WlSurface,
+        _event: wl_surface::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
     ) {
     }
 }
@@ -122,12 +121,12 @@ impl Dispatch<wl_seat::WlSeat, ()> for State {
 
 impl Dispatch<xdg_wm_base::XdgWmBase, ()> for State {
     fn event(
-        state: &mut Self,
-        proxy: &xdg_wm_base::XdgWmBase,
-        event: xdg_wm_base::Event,
-        data: &(),
-        conn: &Connection,
-        qhandle: &QueueHandle<Self>,
+        _state: &mut Self,
+        _proxy: &xdg_wm_base::XdgWmBase,
+        _event: xdg_wm_base::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
     ) {
     }
 }
@@ -171,12 +170,10 @@ impl Dispatch<zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2, (
         event: <zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2 as wayland_client::Proxy>::Event,
         _data: &(),
         _conn: &Connection,
-        qh: &QueueHandle<Self>,
+        _qh: &QueueHandle<Self>,
     ) {
         match event {
-            zwp_input_method_keyboard_grab_v2::Event::Keymap {
-                format, fd, size, ..
-            } => {
+            zwp_input_method_keyboard_grab_v2::Event::Keymap { fd, size, .. } => {
                 if let Some(vk) = &state.virtual_keyboard {
                     vk.keymap(1, unsafe { BorrowedFd::borrow_raw(fd.as_raw_fd()) }, size);
                 }
@@ -259,24 +256,24 @@ impl Dispatch<zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2, (
 
 impl Dispatch<zwp_virtual_keyboard_v1::ZwpVirtualKeyboardV1, ()> for State {
     fn event(
-        state: &mut Self,
-        proxy: &zwp_virtual_keyboard_v1::ZwpVirtualKeyboardV1,
-        event: <zwp_virtual_keyboard_v1::ZwpVirtualKeyboardV1 as wayland_client::Proxy>::Event,
-        data: &(),
-        conn: &Connection,
-        qhandle: &QueueHandle<Self>,
+        _state: &mut Self,
+        _proxy: &zwp_virtual_keyboard_v1::ZwpVirtualKeyboardV1,
+        _event: <zwp_virtual_keyboard_v1::ZwpVirtualKeyboardV1 as wayland_client::Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
     ) {
     }
 }
 
 impl Dispatch<zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1, ()> for State {
     fn event(
-        state: &mut Self,
-        proxy: &zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1,
-        event: <zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1 as wayland_client::Proxy>::Event,
-        data: &(),
-        conn: &Connection,
-        qhandle: &QueueHandle<Self>,
+        _state: &mut Self,
+        _proxy: &zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1,
+        _event: <zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1 as wayland_client::Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
     ) {
     }
 }
