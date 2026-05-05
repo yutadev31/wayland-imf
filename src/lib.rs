@@ -1,3 +1,4 @@
+pub mod dict;
 pub mod ime;
 pub mod keyboard;
 pub mod state;
