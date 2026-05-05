@@ -1,6 +1,5 @@
 use std::os::fd::OwnedFd;
 
-use wayland_protocols_misc::zwp_virtual_keyboard_v1::client::zwp_virtual_keyboard_v1;
 use xkbcommon::xkb;
 
 use crate::ime::ImeState;
