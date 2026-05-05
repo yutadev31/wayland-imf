@@ -42,6 +42,13 @@ pub fn handle_key(kb: &mut KbState, key: u32, ime: &mut ImeState) {
 
         let sym = state.key_get_one_sym(keycode);
 
+        if !ime.ime_enabled {
+            if let xkb::Keysym::Zenkaku_Hankaku = sym {
+                ime.switch_mode();
+            }
+            return;
+        }
+
         match sym {
             xkb::Keysym::space => {
                 ime.space();

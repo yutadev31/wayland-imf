@@ -1,10 +1,17 @@
+use std::os::fd::{AsRawFd, BorrowedFd};
+
 use wayland_client::{
     Connection, Dispatch, QueueHandle,
-    protocol::{wl_registry, wl_seat},
+    protocol::{wl_compositor, wl_keyboard::KeymapFormat, wl_registry, wl_seat, wl_surface},
 };
-use wayland_protocols_misc::zwp_input_method_v2::client::{
-    zwp_input_method_keyboard_grab_v2, zwp_input_method_manager_v2, zwp_input_method_v2,
+use wayland_protocols::xdg::shell::client::xdg_wm_base;
+use wayland_protocols_misc::{
+    zwp_input_method_v2::client::{
+        zwp_input_method_keyboard_grab_v2, zwp_input_method_manager_v2, zwp_input_method_v2,
+    },
+    zwp_virtual_keyboard_v1::client::{zwp_virtual_keyboard_manager_v1, zwp_virtual_keyboard_v1},
 };
+use xkbcommon::xkb::KEYMAP_FORMAT_TEXT_V1;
 
 use crate::{
     keyboard::{handle_key, handle_keymap, handle_modifiers},
@@ -28,9 +35,27 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
         {
             println!("global: {} v{}", interface, version);
 
+            if interface == "wl_compositor" {
+                state.compositor = Some(registry.bind::<wl_compositor::WlCompositor, _, _>(
+                    name,
+                    version.min(1),
+                    qh,
+                    (),
+                ));
+            }
+
             if interface == "wl_seat" {
                 state.seat =
                     Some(registry.bind::<wl_seat::WlSeat, _, _>(name, version.min(1), qh, ()));
+            }
+
+            if interface == "xdg_wm_base" {
+                state.xdg_wm_base = Some(registry.bind::<xdg_wm_base::XdgWmBase, _, _>(
+                    name,
+                    version.min(1),
+                    qh,
+                    (),
+                ));
             }
 
             if interface == "zwp_input_method_manager_v2" {
@@ -43,7 +68,43 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                     ),
                 );
             }
+
+            if interface == "zwp_virtual_keyboard_manager_v1" {
+                state.vk_manager = Some(
+                    registry
+                        .bind::<zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1, _, _>(
+                            name,
+                            version.min(1),
+                            qh,
+                            (),
+                        ),
+                );
+            }
         }
+    }
+}
+
+impl Dispatch<wl_compositor::WlCompositor, ()> for State {
+    fn event(
+        _state: &mut Self,
+        _proxy: &wl_compositor::WlCompositor,
+        _event: wl_compositor::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+    }
+}
+
+impl Dispatch<wl_surface::WlSurface, ()> for State {
+    fn event(
+        state: &mut Self,
+        proxy: &wl_surface::WlSurface,
+        event: wl_surface::Event,
+        data: &(),
+        conn: &Connection,
+        qhandle: &QueueHandle<Self>,
+    ) {
     }
 }
 
@@ -59,11 +120,23 @@ impl Dispatch<wl_seat::WlSeat, ()> for State {
     }
 }
 
+impl Dispatch<xdg_wm_base::XdgWmBase, ()> for State {
+    fn event(
+        state: &mut Self,
+        proxy: &xdg_wm_base::XdgWmBase,
+        event: xdg_wm_base::Event,
+        data: &(),
+        conn: &Connection,
+        qhandle: &QueueHandle<Self>,
+    ) {
+    }
+}
+
 impl Dispatch<zwp_input_method_v2::ZwpInputMethodV2, ()> for State {
     fn event(
-        _state: &mut Self,
-        _proxy: &zwp_input_method_v2::ZwpInputMethodV2,
-        event: <zwp_input_method_v2::ZwpInputMethodV2 as wayland_client::Proxy>::Event,
+        state: &mut Self,
+        proxy: &zwp_input_method_v2::ZwpInputMethodV2,
+        event: zwp_input_method_v2::Event,
         _data: &(),
         _conn: &Connection,
         qh: &QueueHandle<Self>,
@@ -71,6 +144,8 @@ impl Dispatch<zwp_input_method_v2::ZwpInputMethodV2, ()> for State {
         match event {
             zwp_input_method_v2::Event::Activate => {
                 println!("IME activated");
+                let keyboard_grab = proxy.grab_keyboard(qh, ());
+                state.keyboard_grab = Some(keyboard_grab);
             }
             _ => {}
         }
@@ -99,7 +174,13 @@ impl Dispatch<zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2, (
         qh: &QueueHandle<Self>,
     ) {
         match event {
-            zwp_input_method_keyboard_grab_v2::Event::Keymap { fd, size, .. } => {
+            zwp_input_method_keyboard_grab_v2::Event::Keymap {
+                format, fd, size, ..
+            } => {
+                if let Some(vk) = &state.virtual_keyboard {
+                    vk.keymap(1, unsafe { BorrowedFd::borrow_raw(fd.as_raw_fd()) }, size);
+                }
+
                 handle_keymap(fd, size, &mut state.kb);
             }
             zwp_input_method_keyboard_grab_v2::Event::Modifiers {
@@ -109,6 +190,10 @@ impl Dispatch<zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2, (
                 group,
                 ..
             } => {
+                if let Some(vk) = &state.virtual_keyboard {
+                    vk.modifiers(mods_depressed, mods_latched, mods_locked, group);
+                }
+
                 handle_modifiers(
                     &mut state.kb,
                     mods_depressed,
@@ -123,23 +208,23 @@ impl Dispatch<zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2, (
                 ..
             } => match key_state {
                 wayland_client::WEnum::Value(key_state) => match key_state {
+                    wayland_client::protocol::wl_keyboard::KeyState::Released => {
+                        if let Some(vk) = &state.virtual_keyboard {
+                            vk.key(16, key, 0);
+                        }
+                    }
                     wayland_client::protocol::wl_keyboard::KeyState::Pressed => {
                         println!("key pressed: {}", key);
 
                         handle_key(&mut state.kb, key, &mut state.ime);
 
-                        if let Some(im) = &state.input_method {
-                            if let None = state.keyboard_grab
-                                && state.ime.ime_enabled
-                            {
-                                state.keyboard_grab = Some(im.grab_keyboard(qh, ()));
-                            } else if let Some(keyboard_grab) = &mut state.keyboard_grab
-                                && !state.ime.ime_enabled
-                            {
-                                keyboard_grab.release();
-                                state.keyboard_grab = None;
+                        if !state.ime.ime_enabled {
+                            if let Some(vk) = &state.virtual_keyboard {
+                                vk.key(16, key, 1);
                             }
+                        }
 
+                        if let Some(im) = &state.input_method {
                             if !state.ime.commit_buf.is_empty() {
                                 let buf = state.ime.commit_buf.clone();
                                 im.commit_string(buf);
@@ -169,5 +254,29 @@ impl Dispatch<zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2, (
             },
             _ => {}
         }
+    }
+}
+
+impl Dispatch<zwp_virtual_keyboard_v1::ZwpVirtualKeyboardV1, ()> for State {
+    fn event(
+        state: &mut Self,
+        proxy: &zwp_virtual_keyboard_v1::ZwpVirtualKeyboardV1,
+        event: <zwp_virtual_keyboard_v1::ZwpVirtualKeyboardV1 as wayland_client::Proxy>::Event,
+        data: &(),
+        conn: &Connection,
+        qhandle: &QueueHandle<Self>,
+    ) {
+    }
+}
+
+impl Dispatch<zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1, ()> for State {
+    fn event(
+        state: &mut Self,
+        proxy: &zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1,
+        event: <zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1 as wayland_client::Proxy>::Event,
+        data: &(),
+        conn: &Connection,
+        qhandle: &QueueHandle<Self>,
+    ) {
     }
 }

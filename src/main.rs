@@ -19,6 +19,11 @@ fn main() {
         state.input_method = Some(im);
     }
 
+    if let (Some(seat), Some(vk_manager)) = (&state.seat, &state.vk_manager) {
+        let vk = vk_manager.create_virtual_keyboard(seat, &qh, ());
+        state.virtual_keyboard = Some(vk);
+    }
+
     loop {
         event_queue.blocking_dispatch(&mut state).unwrap();
     }
