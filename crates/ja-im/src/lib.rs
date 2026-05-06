@@ -95,8 +95,61 @@ fn to_kana(table: &HashMap<&'static str, &'static str>, input: &str) -> String {
     result
 }
 
+fn hira_to_okuri(input: &str) -> Option<(String, char)> {
+    let table = [
+        ("う", 'u'),
+        ("い", 'i'),
+        ("く", 'k'),
+        ("す", 's'),
+        ("つ", 't'),
+        ("ぬ", 'n'),
+        ("む", 'm'),
+        ("る", 'r'),
+        ("ぐ", 'g'),
+        ("ぶ", 'b'),
+    ];
+
+    for (kana, key) in table {
+        if input.ends_with(kana) {
+            let stem = input.trim_end_matches(kana).to_string();
+            return Some((stem, key));
+        }
+    }
+
+    None
+}
+
 fn generate_candidates(text: &str, dict: &HashMap<String, Vec<String>>) -> Vec<String> {
-    return dict.get(text).map(|list| list.clone()).unwrap_or_default();
+    if let Some(list) = dict.get(text) {
+        return list.clone();
+    }
+
+    if let Some((stem, okuri)) = hira_to_okuri(text) {
+        let key = format!("{}{}", stem, okuri);
+
+        if let Some(list) = dict.get(&key) {
+            let okuri_kana = match okuri {
+                'u' => "う",
+                'i' => "い",
+                'k' => "く",
+                's' => "す",
+                't' => "つ",
+                'n' => "ぬ",
+                'm' => "む",
+                'r' => "る",
+                'g' => "ぐ",
+                'b' => "ぶ",
+                _ => "",
+            };
+
+            return list
+                .iter()
+                .map(|kanji| format!("{}{}", kanji, okuri_kana))
+                .collect();
+        }
+    }
+
+    dict.get(text).cloned().unwrap_or_default()
 }
 
 #[derive(Debug)]
@@ -125,7 +178,19 @@ impl InputMethod for JapaneseInputMethod {
     }
 
     fn on_update_preedit(&mut self, ctx: &mut Context, text: String) {
-        let list = generate_candidates(&text, &self.dict);
+        let mut list = generate_candidates(&text, &self.dict);
+        list.push(text.clone());
+        list.push(
+            text.chars()
+                .filter_map(|ch| {
+                    if ch.is_ascii() {
+                        Some(ch)
+                    } else {
+                        char::from_u32((ch as u32) + 0x60)
+                    }
+                })
+                .collect(),
+        );
         ctx.set_candidates(list);
     }
 }
