@@ -120,8 +120,10 @@ fn hira_to_okuri(input: &str) -> Option<(String, char)> {
 }
 
 fn generate_candidates(text: &str, dict: &HashMap<String, Vec<String>>) -> Vec<String> {
+    let mut result: Vec<String> = Vec::new();
+
     if let Some(list) = dict.get(text) {
-        return list.clone();
+        result.append(&mut list.clone());
     }
 
     if let Some((stem, okuri)) = hira_to_okuri(text) {
@@ -142,14 +144,31 @@ fn generate_candidates(text: &str, dict: &HashMap<String, Vec<String>>) -> Vec<S
                 _ => "",
             };
 
-            return list
-                .iter()
-                .map(|kanji| format!("{}{}", kanji, okuri_kana))
-                .collect();
+            result.append(
+                &mut list
+                    .iter()
+                    .map(|kanji| format!("{}{}", kanji, okuri_kana))
+                    .collect(),
+            );
         }
     }
 
-    dict.get(text).cloned().unwrap_or_default()
+    if !text.is_empty() {
+        result.push(text.to_string());
+        result.push(
+            text.chars()
+                .filter_map(|ch| {
+                    if ch.is_ascii() {
+                        Some(ch)
+                    } else {
+                        char::from_u32((ch as u32) + 0x60)
+                    }
+                })
+                .collect(),
+        );
+    }
+
+    result
 }
 
 #[derive(Debug)]
@@ -178,19 +197,7 @@ impl InputMethod for JapaneseInputMethod {
     }
 
     fn on_update_preedit(&mut self, ctx: &mut Context, text: String) {
-        let mut list = generate_candidates(&text, &self.dict);
-        list.push(text.clone());
-        list.push(
-            text.chars()
-                .filter_map(|ch| {
-                    if ch.is_ascii() {
-                        Some(ch)
-                    } else {
-                        char::from_u32((ch as u32) + 0x60)
-                    }
-                })
-                .collect(),
-        );
+        let list = generate_candidates(&text, &self.dict);
         ctx.set_candidates(list);
     }
 }

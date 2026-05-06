@@ -55,6 +55,12 @@ pub fn handle_key(kb: &mut KbState, key: u32, ime: &mut ImeState) -> bool {
             xkb::Keysym::Escape => {
                 return ime.escape();
             }
+            xkb::Keysym::Up => {
+                return ime.up();
+            }
+            xkb::Keysym::Down => {
+                return ime.down();
+            }
             xkb::Keysym::Zenkaku_Hankaku => {
                 ime.switch_mode();
             }

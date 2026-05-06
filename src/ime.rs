@@ -95,8 +95,46 @@ impl ImeState {
         return true;
     }
 
+    pub fn up(&mut self) -> bool {
+        if !self.context.preedit_buf.is_empty() && !self.context.candidates.is_empty() {
+            match self.context.selected_index {
+                Some(index) => {
+                    if index == 0 {
+                        self.context.selected_index = Some(self.context.candidates.len() - 1);
+                    } else {
+                        self.context.selected_index = Some(index - 1);
+                    }
+                }
+                None => {
+                    self.context.selected_index = Some(self.context.candidates.len() - 1);
+                }
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    pub fn down(&mut self) -> bool {
+        if !self.context.preedit_buf.is_empty() && !self.context.candidates.is_empty() {
+            match self.context.selected_index {
+                Some(index) => {
+                    self.context.selected_index = Some((index + 1) % self.context.candidates.len());
+                }
+                None => {
+                    self.context.selected_index = Some(0);
+                }
+            }
+            return true;
+        }
+
+        return false;
+    }
+
     pub fn switch_mode(&mut self) {
+        self.last_preedit.clear();
         self.context.preedit_buf.clear();
+        self.context.candidates.clear();
 
         self.method = match self.method {
             InputMethodEnum::Keyboard(_) => {
