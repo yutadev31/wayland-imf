@@ -24,7 +24,7 @@ fn parse_line(line: &str) -> Option<(String, Vec<String>)> {
 }
 
 pub fn load_dict() -> HashMap<String, Vec<String>> {
-    let file = File::open("tmp/SKK-JISYO.M").unwrap();
+    let file = File::open("tmp/SKK-JISYO.L").unwrap();
     let reader = BufReader::new(file);
 
     let mut dict = HashMap::new();
