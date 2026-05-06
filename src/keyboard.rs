@@ -44,13 +44,16 @@ pub fn handle_key(kb: &mut KbState, key: u32, ime: &mut ImeState) -> bool {
 
         match sym {
             xkb::Keysym::space => {
-                ime.space();
+                return ime.space();
             }
             xkb::Keysym::BackSpace => {
                 return ime.backspace();
             }
             xkb::Keysym::Return => {
                 return ime.enter();
+            }
+            xkb::Keysym::Escape => {
+                return ime.escape();
             }
             xkb::Keysym::Zenkaku_Hankaku => {
                 ime.switch_mode();

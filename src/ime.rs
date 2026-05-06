@@ -16,6 +16,7 @@ impl Default for InputMethodEnum {
 #[derive(Debug, Default)]
 pub struct ImeState {
     method: InputMethodEnum,
+    last_preedit: String,
     pub context: Context,
 }
 
@@ -25,6 +26,20 @@ impl ImeState {
             InputMethodEnum::Keyboard(method) => method.on_input_str(&mut self.context, text),
             InputMethodEnum::Japanese(method) => method.on_input_str(&mut self.context, text),
         };
+    }
+
+    pub fn post_update_preedit(&mut self) {
+        let buf = self.context.preedit_buf.clone();
+        match &mut self.method {
+            InputMethodEnum::Keyboard(method) => method.on_update_preedit(&mut self.context, buf),
+            InputMethodEnum::Japanese(method) => method.on_update_preedit(&mut self.context, buf),
+        }
+
+        if self.context.preedit_buf != self.last_preedit {
+            self.context.selected_index = None;
+        }
+
+        self.last_preedit = self.context.preedit_buf.clone();
     }
 
     pub fn backspace(&mut self) -> bool {
@@ -41,22 +56,48 @@ impl ImeState {
             return false;
         }
 
-        let buf = self.context.preedit_buf.clone();
+        let buf = self.get_preedit();
         self.context.preedit_buf.clear();
         self.context.commit_buf.push_str(&buf);
         return true;
     }
 
-    pub fn space(&mut self) {
-        if self.context.preedit_buf.is_empty() {
-            self.input_char(" ".into());
-            return;
+    pub fn escape(&mut self) -> bool {
+        if let Some(_) = self.context.selected_index {
+            self.context.selected_index = None;
+            return true;
         }
 
-        // TODO 変換処理
+        if !self.context.preedit_buf.is_empty() {
+            self.context.preedit_buf.clear();
+            return true;
+        }
+
+        return false;
+    }
+
+    pub fn space(&mut self) -> bool {
+        if self.context.preedit_buf.is_empty() {
+            return false;
+        }
+
+        if !self.context.candidates.is_empty() {
+            match self.context.selected_index {
+                Some(index) => {
+                    self.context.selected_index = Some((index + 1) % self.context.candidates.len());
+                }
+                None => {
+                    self.context.selected_index = Some(0);
+                }
+            }
+        }
+
+        return true;
     }
 
     pub fn switch_mode(&mut self) {
+        self.context.preedit_buf.clear();
+
         self.method = match self.method {
             InputMethodEnum::Keyboard(_) => {
                 InputMethodEnum::Japanese(JapaneseInputMethod::default())
@@ -65,5 +106,17 @@ impl ImeState {
                 InputMethodEnum::Keyboard(KeyboardInputMethod::default())
             }
         };
+    }
+
+    pub fn get_preedit(&self) -> String {
+        if let Some(index) = self.context.selected_index {
+            let candidates = self.context.candidates.clone();
+            return candidates
+                .get(index)
+                .map(|text| text.clone())
+                .unwrap_or(self.context.preedit_buf.clone());
+        }
+
+        return self.context.preedit_buf.clone();
     }
 }

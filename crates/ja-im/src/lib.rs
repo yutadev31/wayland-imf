@@ -2,6 +2,9 @@ use std::collections::HashMap;
 
 use ime_core::{Context, InputMethod};
 
+use crate::dict::load_dict;
+
+mod dict;
 mod romaji;
 
 fn is_vowel(c: char) -> bool {
@@ -90,15 +93,21 @@ fn to_kana(table: &HashMap<&'static str, &'static str>, input: &str) -> String {
     result
 }
 
+fn generate_candidates(text: &str, dict: &HashMap<String, Vec<String>>) -> Vec<String> {
+    return dict.get(text).map(|list| list.clone()).unwrap_or_default();
+}
+
 #[derive(Debug)]
 pub struct JapaneseInputMethod {
     romaji_table: HashMap<&'static str, &'static str>,
+    dict: HashMap<String, Vec<String>>,
 }
 
 impl Default for JapaneseInputMethod {
     fn default() -> Self {
         Self {
             romaji_table: romaji::romaji_table(),
+            dict: load_dict(),
         }
     }
 }
@@ -111,5 +120,10 @@ impl InputMethod for JapaneseInputMethod {
         let buf = to_kana(&self.romaji_table, &buf);
         ctx.set_preedit(buf);
         return true;
+    }
+
+    fn on_update_preedit(&mut self, ctx: &mut Context, text: String) {
+        let list = generate_candidates(&text, &self.dict);
+        ctx.set_candidates(list);
     }
 }

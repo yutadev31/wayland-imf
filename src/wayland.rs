@@ -235,6 +235,8 @@ impl Dispatch<zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2, (
                             }
                         }
 
+                        state.ime.post_update_preedit();
+
                         if let Some(im) = &state.wayland.input_method {
                             if !state.ime.context.commit_buf.is_empty() {
                                 let buf = state.ime.context.commit_buf.clone();
@@ -242,14 +244,17 @@ impl Dispatch<zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2, (
                                 state.ime.context.commit_buf.clear();
                             }
 
-                            im.set_preedit_string(
-                                state.ime.context.preedit_buf.clone(),
-                                state.ime.context.preedit_buf.len().try_into().unwrap(),
-                                state.ime.context.preedit_buf.len().try_into().unwrap(),
-                            );
+                            let preedit = state.ime.get_preedit();
+                            let cursor = preedit.len().try_into().unwrap();
+                            im.set_preedit_string(preedit, cursor, cursor);
 
                             im.commit(0);
                         }
+
+                        println!(
+                            "{:?} {:?}",
+                            state.ime.context.selected_index, state.ime.context.candidates
+                        );
                     }
                     _ => {}
                 },
