@@ -122,7 +122,6 @@ pub fn romaji_table() -> HashMap<&'static str, &'static str> {
         ("wi", "うぃ"),
         ("we", "うぇ"),
         ("wo", "を"),
-        ("n", "ん"),
         ("va", "ゔぁ"),
         ("vi", "ゔぃ"),
         ("vu", "ゔ"),

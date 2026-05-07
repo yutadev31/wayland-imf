@@ -45,10 +45,6 @@ fn to_kana(table: &HashMap<&'static str, &'static str>, input: &str) -> String {
                     i += 1;
                     continue;
                 }
-            } else {
-                result.push('n');
-                i += 1;
-                continue;
             }
         }
 
