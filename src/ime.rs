@@ -1,5 +1,5 @@
-use ime_core::{Context, InputMethod, KeyboardInputMethod};
-use ja_im::JapaneseInputMethod;
+use imf_core::{Context, InputMethod, KeyboardInputMethod};
+use japanese_ime::JapaneseInputMethod;
 
 #[derive(Default)]
 pub struct ImeState {

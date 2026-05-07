@@ -57,27 +57,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5baebc0774151f905a1a2cc41989300b1e6fbb29aff0ceffa1064fdd3088d582"
 
 [[package]]
-name = "ime"
-version = "0.1.0"
-dependencies = [
- "ab_glyph",
- "ime-core",
- "ja-im",
- "wayland-client",
- "wayland-protocols",
- "wayland-protocols-misc",
- "xkbcommon",
-]
-
-[[package]]
-name = "ime-core"
+name = "imf-core"
 version = "0.1.0"
 
 [[package]]
-name = "ja-im"
+name = "japanese-ime"
 version = "0.1.0"
 dependencies = [
- "ime-core",
+ "imf-core",
 ]
 
 [[package]]
@@ -209,6 +196,19 @@ dependencies = [
  "rustix",
  "wayland-backend",
  "wayland-scanner",
+]
+
+[[package]]
+name = "wayland-imf"
+version = "0.1.0"
+dependencies = [
+ "ab_glyph",
+ "imf-core",
+ "japanese-ime",
+ "wayland-client",
+ "wayland-protocols",
+ "wayland-protocols-misc",
+ "xkbcommon",
 ]
 
 [[package]]

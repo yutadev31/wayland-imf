@@ -7,11 +7,11 @@ wayland-client = "0.31.14"
 wayland-protocols = { version = "0.32.12", features = ["client"] }
 wayland-protocols-misc = { version = "0.3.12", features = ["client"] }
 xkbcommon = "0.9.0"
-ime-core.path = "crates/ime-core"
-ja-im.path = "crates/ja-im"
+imf-core.path = "crates/ime-core"
+japanese-ime.path = "crates/ja-im"
 
 [package]
-name = "ime"
+name = "wayland-imf"
 version = "0.1.0"
 edition = "2024"
 
@@ -21,5 +21,5 @@ wayland-client.workspace = true
 wayland-protocols.workspace = true
 wayland-protocols-misc.workspace = true
 xkbcommon.workspace = true
-ime-core.workspace = true
-ja-im.workspace = true
+imf-core.workspace = true
+japanese-ime.workspace = true

@@ -1,7 +1,7 @@
 [package]
-name = "ja-im"
+name = "japanese-ime"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ime-core.workspace = true
+imf-core.workspace = true

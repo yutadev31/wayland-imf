@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ime_core::{Context, InputMethod};
+use imf_core::{Context, InputMethod};
 
 use crate::dict::load_dict;
 

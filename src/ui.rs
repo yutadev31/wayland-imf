@@ -7,7 +7,7 @@ use std::{
 };
 
 use ab_glyph::{Font, FontVec, PxScale, ScaleFont, point};
-use ime_core::Context;
+use imf_core::Context;
 use wayland_client::{
     Connection, Dispatch, QueueHandle,
     protocol::{wl_buffer, wl_compositor, wl_shm, wl_shm_pool, wl_surface},

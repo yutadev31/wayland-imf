@@ -1,4 +1,4 @@
-use ime::state::State;
+use wayland_imf::state::State;
 use wayland_client::Connection;
 
 fn main() {
