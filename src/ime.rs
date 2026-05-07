@@ -1,39 +1,27 @@
 use ime_core::{Context, InputMethod, KeyboardInputMethod};
 use ja_im::JapaneseInputMethod;
 
-#[derive(Debug)]
-pub enum InputMethodEnum {
-    Keyboard(KeyboardInputMethod),
-    Japanese(JapaneseInputMethod),
-}
-
-impl Default for InputMethodEnum {
-    fn default() -> Self {
-        InputMethodEnum::Keyboard(KeyboardInputMethod::default())
-    }
-}
-
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct ImeState {
-    method: InputMethodEnum,
+    methods: Vec<Box<dyn InputMethod>>,
+    current_method: usize,
     last_preedit: String,
     pub context: Context,
 }
 
 impl ImeState {
+    pub fn init(&mut self) {
+        self.methods.push(Box::new(KeyboardInputMethod::default()));
+        self.methods.push(Box::new(JapaneseInputMethod::default()));
+    }
+
     pub fn input_char(&mut self, text: String) -> bool {
-        return match &mut self.method {
-            InputMethodEnum::Keyboard(method) => method.on_input_str(&mut self.context, text),
-            InputMethodEnum::Japanese(method) => method.on_input_str(&mut self.context, text),
-        };
+        self.methods[self.current_method].on_input_str(&mut self.context, text)
     }
 
     pub fn post_update_preedit(&mut self) {
         let buf = self.context.preedit_buf.clone();
-        match &mut self.method {
-            InputMethodEnum::Keyboard(method) => method.on_update_preedit(&mut self.context, buf),
-            InputMethodEnum::Japanese(method) => method.on_update_preedit(&mut self.context, buf),
-        }
+        self.methods[self.current_method].on_update_preedit(&mut self.context, buf);
 
         if self.context.preedit_buf != self.last_preedit {
             self.context.selected_index = None;
@@ -136,14 +124,7 @@ impl ImeState {
         self.context.preedit_buf.clear();
         self.context.candidates.clear();
 
-        self.method = match self.method {
-            InputMethodEnum::Keyboard(_) => {
-                InputMethodEnum::Japanese(JapaneseInputMethod::default())
-            }
-            InputMethodEnum::Japanese(_) => {
-                InputMethodEnum::Keyboard(KeyboardInputMethod::default())
-            }
-        };
+        self.current_method = (self.current_method + 1) % self.methods.len();
     }
 
     pub fn get_preedit(&self) -> String {
