@@ -1,14 +1,14 @@
 [workspace]
 resolver = "3"
-members = ["crates/ime-core", "crates/ja-im"]
+members = ["crates/imf-core", "crates/japanese-ime"]
 
 [workspace.dependencies]
 wayland-client = "0.31.14"
 wayland-protocols = { version = "0.32.12", features = ["client"] }
 wayland-protocols-misc = { version = "0.3.12", features = ["client"] }
 xkbcommon = "0.9.0"
-imf-core.path = "crates/ime-core"
-japanese-ime.path = "crates/ja-im"
+imf-core.path = "crates/imf-core"
+japanese-ime.path = "crates/japanese-ime"
 
 [package]
 name = "wayland-imf"
