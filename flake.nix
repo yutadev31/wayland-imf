@@ -21,17 +21,33 @@
       rust = pkgs.rust-bin.stable.latest.default.override {
         extensions = [ "rust-src" ];
       };
+
+      nativeBuildInputs = with pkgs; [
+        rust
+        pkg-config
+      ];
+
+      buildInputs = with pkgs; [
+        wayland
+        libxkbcommon
+      ];
     in
     {
-      devShells.${system}.default = pkgs.mkShell {
-        nativeBuildInputs = with pkgs; [
-          wayland
-          libxkbcommon
-        ];
+      packages.${system}.default = pkgs.rustPlatform.buildRustPackage {
+        pname = "wayland-imf";
+        version = "0.1.0";
 
-        buildInputs = with pkgs; [
-          rust
-        ];
+        src = ./.;
+
+        cargoLock = {
+          lockFile = ./Cargo.lock;
+        };
+
+        inherit nativeBuildInputs buildInputs;
+      };
+
+      devShells.${system}.default = pkgs.mkShell {
+        inherit nativeBuildInputs buildInputs;
 
         shellHook = "";
       };
