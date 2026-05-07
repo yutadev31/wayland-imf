@@ -31,111 +31,129 @@ impl ImeState {
     }
 
     pub fn backspace(&mut self) -> bool {
-        if self.context.preedit_buf.is_empty() {
+        if !self.has_preedit() {
             return false;
         }
 
         self.context.preedit_buf.pop();
-        return true;
+        true
     }
 
     pub fn enter(&mut self) -> bool {
-        if self.context.preedit_buf.is_empty() {
+        if !self.has_preedit() {
             return false;
         }
 
-        let buf = self.get_preedit();
+        let buf = self.current_preedit_text();
         self.context.preedit_buf.clear();
-        self.context.commit_buf.push_str(&buf);
-        return true;
+        self.context.commit_string(buf);
+        true
     }
 
     pub fn escape(&mut self) -> bool {
-        if let Some(_) = self.context.selected_index {
+        if self.context.selected_index.is_some() {
             self.context.selected_index = None;
             return true;
         }
 
-        if !self.context.preedit_buf.is_empty() {
+        if self.has_preedit() {
             self.context.preedit_buf.clear();
             return true;
         }
 
-        return false;
+        false
     }
 
     pub fn space(&mut self) -> bool {
-        if self.context.preedit_buf.is_empty() {
+        if !self.has_preedit() {
             return false;
         }
 
-        if !self.context.candidates.is_empty() {
-            match self.context.selected_index {
-                Some(index) => {
-                    self.context.selected_index = Some((index + 1) % self.context.candidates.len());
-                }
-                None => {
-                    self.context.selected_index = Some(0);
-                }
-            }
+        if self.has_candidates() {
+            self.select_next_candidate();
         }
 
-        return true;
+        true
     }
 
     pub fn up(&mut self) -> bool {
-        if !self.context.preedit_buf.is_empty() && !self.context.candidates.is_empty() {
-            match self.context.selected_index {
-                Some(index) => {
-                    if index == 0 {
-                        self.context.selected_index = Some(self.context.candidates.len() - 1);
-                    } else {
-                        self.context.selected_index = Some(index - 1);
-                    }
-                }
-                None => {
-                    self.context.selected_index = Some(self.context.candidates.len() - 1);
-                }
-            }
+        if self.can_select_candidates() {
+            self.select_previous_candidate();
             return true;
         }
 
-        return false;
+        false
     }
 
     pub fn down(&mut self) -> bool {
-        if !self.context.preedit_buf.is_empty() && !self.context.candidates.is_empty() {
-            match self.context.selected_index {
-                Some(index) => {
-                    self.context.selected_index = Some((index + 1) % self.context.candidates.len());
-                }
-                None => {
-                    self.context.selected_index = Some(0);
-                }
-            }
+        if self.can_select_candidates() {
+            self.select_next_candidate();
             return true;
         }
 
-        return false;
+        false
     }
 
     pub fn switch_mode(&mut self) {
-        self.last_preedit.clear();
-        self.context.preedit_buf.clear();
-        self.context.candidates.clear();
-
+        self.reset_composition();
         self.current_method = (self.current_method + 1) % self.methods.len();
     }
 
     pub fn get_preedit(&self) -> String {
+        self.current_preedit_text()
+    }
+
+    fn has_preedit(&self) -> bool {
+        !self.context.preedit_buf.is_empty()
+    }
+
+    fn has_candidates(&self) -> bool {
+        !self.context.candidates.is_empty()
+    }
+
+    fn can_select_candidates(&self) -> bool {
+        self.has_preedit() && self.has_candidates()
+    }
+
+    fn reset_composition(&mut self) {
+        self.last_preedit.clear();
+        self.context.preedit_buf.clear();
+        self.context.candidates.clear();
+        self.context.selected_index = None;
+    }
+
+    fn current_preedit_text(&self) -> String {
         if let Some(index) = self.context.selected_index {
-            let candidates = self.context.candidates.clone();
-            return candidates
+            return self
+                .context
+                .candidates
                 .get(index)
                 .map(|text| text.clone())
                 .unwrap_or(self.context.preedit_buf.clone());
         }
 
-        return self.context.preedit_buf.clone();
+        self.context.preedit_buf.clone()
+    }
+
+    fn select_next_candidate(&mut self) {
+        if !self.has_candidates() {
+            return;
+        }
+
+        self.context.selected_index = Some(match self.context.selected_index {
+            Some(index) => (index + 1) % self.context.candidates.len(),
+            None => 0,
+        });
+    }
+
+    fn select_previous_candidate(&mut self) {
+        if !self.has_candidates() {
+            return;
+        }
+
+        self.context.selected_index = Some(match self.context.selected_index {
+            Some(0) | None => self.context.candidates.len() - 1,
+            Some(index) => index - 1,
+        });
     }
 }

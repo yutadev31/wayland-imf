@@ -22,7 +22,7 @@ impl Context {
 
 pub trait InputMethod {
     fn on_input_str(&mut self, ctx: &mut Context, text: String) -> bool;
-    fn on_update_preedit(&mut self, ctx: &mut Context, text: String) {}
+    fn on_update_preedit(&mut self, _ctx: &mut Context, _text: String) {}
 }
 
 #[derive(Debug, Default)]

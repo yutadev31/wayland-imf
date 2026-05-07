@@ -33,6 +33,169 @@ pub struct WaylandState {
     pub vk_manager: Option<zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1>,
 }
 
+fn bind_global(
+    state: &mut State,
+    registry: &wl_registry::WlRegistry,
+    name: u32,
+    interface: &str,
+    version: u32,
+    qh: &QueueHandle<State>,
+) {
+    match interface {
+        "wl_compositor" => {
+            state.wayland.compositor = Some(registry.bind::<wl_compositor::WlCompositor, _, _>(
+                name,
+                version.min(1),
+                qh,
+                (),
+            ));
+        }
+        "wl_seat" => {
+            state.wayland.seat =
+                Some(registry.bind::<wl_seat::WlSeat, _, _>(name, version.min(1), qh, ()));
+        }
+        "wl_shm" => {
+            state.wayland.shm =
+                Some(registry.bind::<wl_shm::WlShm, _, _>(name, version.min(1), qh, ()));
+        }
+        "xdg_wm_base" => {
+            state.wayland.xdg_wm_base =
+                Some(registry.bind::<xdg_wm_base::XdgWmBase, _, _>(name, version.min(1), qh, ()));
+        }
+        "zwp_input_method_manager_v2" => {
+            state.wayland.im_manager = Some(
+                registry.bind::<zwp_input_method_manager_v2::ZwpInputMethodManagerV2, _, _>(
+                    name,
+                    version.min(1),
+                    qh,
+                    (),
+                ),
+            );
+        }
+        "zwp_virtual_keyboard_manager_v1" => {
+            state.wayland.vk_manager = Some(
+                registry
+                    .bind::<zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1, _, _>(
+                        name,
+                        version.min(1),
+                        qh,
+                        (),
+                    ),
+            );
+        }
+        _ => {}
+    }
+}
+
+fn handle_input_method_event(
+    state: &mut State,
+    proxy: &zwp_input_method_v2::ZwpInputMethodV2,
+    event: zwp_input_method_v2::Event,
+    qh: &QueueHandle<State>,
+) {
+    match event {
+        zwp_input_method_v2::Event::Activate => {
+            println!("IME activated");
+            let keyboard_grab = proxy.grab_keyboard(qh, ());
+            state.wayland.keyboard_grab = Some(keyboard_grab);
+            state.refresh_candidate_popup();
+        }
+        zwp_input_method_v2::Event::Deactivate => {
+            state.hide_candidate_popup();
+        }
+        _ => {}
+    }
+}
+
+fn handle_key_released(state: &mut State, key: u32) {
+    if let Some(vk) = &state.wayland.virtual_keyboard {
+        vk.key(0, key, 0);
+    }
+}
+
+fn handle_key_pressed(state: &mut State, key: u32) {
+    println!("key pressed: {}", key);
+
+    if !handle_key(&mut state.kb, key, &mut state.ime) {
+        if let Some(vk) = &state.wayland.virtual_keyboard {
+            vk.key(0, key, 1);
+        }
+    }
+
+    state.ime.post_update_preedit();
+    state.refresh_candidate_popup();
+    sync_input_method(state);
+}
+
+fn sync_input_method(state: &mut State) {
+    let Some(im) = state.wayland.input_method.as_ref() else {
+        return;
+    };
+
+    if !state.ime.context.commit_buf.is_empty() {
+        let buf = state.ime.context.commit_buf.clone();
+        im.commit_string(buf);
+        state.ime.context.commit_buf.clear();
+    }
+
+    let preedit = state.ime.get_preedit();
+    let cursor = preedit.len().try_into().unwrap();
+    im.set_preedit_string(preedit, cursor, cursor);
+    im.commit(0);
+}
+
+fn handle_keyboard_grab_event(
+    state: &mut State,
+    event: <zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2 as wayland_client::Proxy>::Event,
+) {
+    match event {
+        zwp_input_method_keyboard_grab_v2::Event::Keymap { fd, size, .. } => {
+            if let Some(vk) = &state.wayland.virtual_keyboard {
+                vk.keymap(1, unsafe { BorrowedFd::borrow_raw(fd.as_raw_fd()) }, size);
+            }
+
+            handle_keymap(fd, size, &mut state.kb);
+        }
+        zwp_input_method_keyboard_grab_v2::Event::Modifiers {
+            mods_depressed,
+            mods_latched,
+            mods_locked,
+            group,
+            ..
+        } => {
+            if let Some(vk) = &state.wayland.virtual_keyboard {
+                vk.modifiers(mods_depressed, mods_latched, mods_locked, group);
+            }
+
+            handle_modifiers(
+                &mut state.kb,
+                mods_depressed,
+                mods_latched,
+                mods_locked,
+                group,
+            );
+        }
+        zwp_input_method_keyboard_grab_v2::Event::Key {
+            key,
+            state: key_state,
+            ..
+        } => match key_state {
+            wayland_client::WEnum::Value(
+                wayland_client::protocol::wl_keyboard::KeyState::Released,
+            ) => {
+                handle_key_released(state, key);
+            }
+            wayland_client::WEnum::Value(
+                wayland_client::protocol::wl_keyboard::KeyState::Pressed,
+            ) => {
+                handle_key_pressed(state, key);
+            }
+            _ => {}
+        },
+        _ => {}
+    }
+}
+
 impl Dispatch<wl_registry::WlRegistry, ()> for State {
     fn event(
         state: &mut Self,
@@ -48,59 +211,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
             version,
         } = event
         {
-            println!("global: {} v{}", interface, version);
-
-            if interface == "wl_compositor" {
-                state.wayland.compositor =
-                    Some(registry.bind::<wl_compositor::WlCompositor, _, _>(
-                        name,
-                        version.min(1),
-                        qh,
-                        (),
-                    ));
-            }
-
-            if interface == "wl_seat" {
-                state.wayland.seat =
-                    Some(registry.bind::<wl_seat::WlSeat, _, _>(name, version.min(1), qh, ()));
-            }
-
-            if interface == "wl_shm" {
-                state.wayland.shm =
-                    Some(registry.bind::<wl_shm::WlShm, _, _>(name, version.min(1), qh, ()));
-            }
-
-            if interface == "xdg_wm_base" {
-                state.wayland.xdg_wm_base = Some(registry.bind::<xdg_wm_base::XdgWmBase, _, _>(
-                    name,
-                    version.min(1),
-                    qh,
-                    (),
-                ));
-            }
-
-            if interface == "zwp_input_method_manager_v2" {
-                state.wayland.im_manager = Some(
-                    registry.bind::<zwp_input_method_manager_v2::ZwpInputMethodManagerV2, _, _>(
-                        name,
-                        version.min(1),
-                        qh,
-                        (),
-                    ),
-                );
-            }
-
-            if interface == "zwp_virtual_keyboard_manager_v1" {
-                state.wayland.vk_manager = Some(
-                    registry
-                        .bind::<zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1, _, _>(
-                            name,
-                            version.min(1),
-                            qh,
-                            (),
-                        ),
-                );
-            }
+            bind_global(state, registry, name, &interface, version, qh);
         }
     }
 }
@@ -162,18 +273,7 @@ impl Dispatch<zwp_input_method_v2::ZwpInputMethodV2, ()> for State {
         _conn: &Connection,
         qh: &QueueHandle<Self>,
     ) {
-        match event {
-            zwp_input_method_v2::Event::Activate => {
-                println!("IME activated");
-                let keyboard_grab = proxy.grab_keyboard(qh, ());
-                state.wayland.keyboard_grab = Some(keyboard_grab);
-                state.refresh_candidate_popup();
-            }
-            zwp_input_method_v2::Event::Deactivate => {
-                state.hide_candidate_popup();
-            }
-            _ => {}
-        }
+        handle_input_method_event(state, proxy, event, qh);
     }
 }
 
@@ -198,81 +298,7 @@ impl Dispatch<zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2, (
         _conn: &Connection,
         _qh: &QueueHandle<Self>,
     ) {
-        match event {
-            zwp_input_method_keyboard_grab_v2::Event::Keymap { fd, size, .. } => {
-                if let Some(vk) = &state.wayland.virtual_keyboard {
-                    vk.keymap(1, unsafe { BorrowedFd::borrow_raw(fd.as_raw_fd()) }, size);
-                }
-
-                handle_keymap(fd, size, &mut state.kb);
-            }
-            zwp_input_method_keyboard_grab_v2::Event::Modifiers {
-                mods_depressed,
-                mods_latched,
-                mods_locked,
-                group,
-                ..
-            } => {
-                if let Some(vk) = &state.wayland.virtual_keyboard {
-                    vk.modifiers(mods_depressed, mods_latched, mods_locked, group);
-                }
-
-                handle_modifiers(
-                    &mut state.kb,
-                    mods_depressed,
-                    mods_latched,
-                    mods_locked,
-                    group,
-                );
-            }
-            zwp_input_method_keyboard_grab_v2::Event::Key {
-                key,
-                state: key_state,
-                ..
-            } => match key_state {
-                wayland_client::WEnum::Value(key_state) => match key_state {
-                    wayland_client::protocol::wl_keyboard::KeyState::Released => {
-                        if let Some(vk) = &state.wayland.virtual_keyboard {
-                            vk.key(0, key, 0);
-                        }
-                    }
-                    wayland_client::protocol::wl_keyboard::KeyState::Pressed => {
-                        println!("key pressed: {}", key);
-
-                        if !handle_key(&mut state.kb, key, &mut state.ime) {
-                            if let Some(vk) = &state.wayland.virtual_keyboard {
-                                vk.key(0, key, 1);
-                            }
-                        }
-
-                        state.ime.post_update_preedit();
-                        state.refresh_candidate_popup();
-
-                        if let Some(im) = &state.wayland.input_method {
-                            if !state.ime.context.commit_buf.is_empty() {
-                                let buf = state.ime.context.commit_buf.clone();
-                                im.commit_string(buf);
-                                state.ime.context.commit_buf.clear();
-                            }
-
-                            let preedit = state.ime.get_preedit();
-                            let cursor = preedit.len().try_into().unwrap();
-                            im.set_preedit_string(preedit, cursor, cursor);
-
-                            im.commit(0);
-                        }
-
-                        println!(
-                            "{:?} {:?}",
-                            state.ime.context.selected_index, state.ime.context.candidates
-                        );
-                    }
-                    _ => {}
-                },
-                _ => {}
-            },
-            _ => {}
-        }
+        handle_keyboard_grab_event(state, event);
     }
 }
 

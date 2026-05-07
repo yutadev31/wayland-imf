@@ -27,8 +27,6 @@ fn to_kana(table: &HashMap<&'static str, &'static str>, input: &str) -> String {
         // ① n（ん）処理
         // =========================
         if chars[i] == 'n' {
-            println!("test 1: {:?}, {}", chars, i);
-
             if i + 1 < chars.len() {
                 let next = chars[i + 1];
 
