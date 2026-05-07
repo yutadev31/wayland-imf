@@ -2,7 +2,7 @@ use std::os::fd::{AsRawFd, BorrowedFd};
 
 use wayland_client::{
     Connection, Dispatch, QueueHandle,
-    protocol::{wl_compositor, wl_registry, wl_seat, wl_surface},
+    protocol::{wl_compositor, wl_registry, wl_seat, wl_shm, wl_surface},
 };
 use wayland_protocols::xdg::shell::client::xdg_wm_base;
 use wayland_protocols_misc::{
@@ -24,6 +24,7 @@ use crate::{
 pub struct WaylandState {
     pub compositor: Option<wl_compositor::WlCompositor>,
     pub seat: Option<wl_seat::WlSeat>,
+    pub shm: Option<wl_shm::WlShm>,
     pub xdg_wm_base: Option<xdg_wm_base::XdgWmBase>,
     pub input_method: Option<zwp_input_method_v2::ZwpInputMethodV2>,
     pub im_manager: Option<zwp_input_method_manager_v2::ZwpInputMethodManagerV2>,
@@ -62,6 +63,11 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
             if interface == "wl_seat" {
                 state.wayland.seat =
                     Some(registry.bind::<wl_seat::WlSeat, _, _>(name, version.min(1), qh, ()));
+            }
+
+            if interface == "wl_shm" {
+                state.wayland.shm =
+                    Some(registry.bind::<wl_shm::WlShm, _, _>(name, version.min(1), qh, ()));
             }
 
             if interface == "xdg_wm_base" {
@@ -161,6 +167,10 @@ impl Dispatch<zwp_input_method_v2::ZwpInputMethodV2, ()> for State {
                 println!("IME activated");
                 let keyboard_grab = proxy.grab_keyboard(qh, ());
                 state.wayland.keyboard_grab = Some(keyboard_grab);
+                state.refresh_candidate_popup();
+            }
+            zwp_input_method_v2::Event::Deactivate => {
+                state.hide_candidate_popup();
             }
             _ => {}
         }
@@ -236,6 +246,7 @@ impl Dispatch<zwp_input_method_keyboard_grab_v2::ZwpInputMethodKeyboardGrabV2, (
                         }
 
                         state.ime.post_update_preedit();
+                        state.refresh_candidate_popup();
 
                         if let Some(im) = &state.wayland.input_method {
                             if !state.ime.context.commit_buf.is_empty() {
