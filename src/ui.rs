@@ -212,7 +212,9 @@ fn visible_start_index(candidate_count: usize, selected_index: Option<usize>) ->
     let max_start = candidate_count - MAX_VISIBLE_CANDIDATES;
     let selected_index = selected_index.unwrap_or(0).min(candidate_count - 1);
 
-    selected_index.saturating_sub(MAX_VISIBLE_CANDIDATES - 1).min(max_start)
+    selected_index
+        .saturating_sub(MAX_VISIBLE_CANDIDATES - 1)
+        .min(max_start)
 }
 
 fn create_shared_file(size: u64) -> std::io::Result<File> {
@@ -304,14 +306,7 @@ fn draw_text(
     }
 }
 
-fn blend_pixel(
-    pixels: &mut [u8],
-    width: u32,
-    x: u32,
-    y: u32,
-    color: [u8; 4],
-    coverage: f32,
-) {
+fn blend_pixel(pixels: &mut [u8], width: u32, x: u32, y: u32, color: [u8; 4], coverage: f32) {
     let index = ((y * width + x) * 4) as usize;
     let src_alpha = (color[3] as f32 / 255.0) * coverage;
     let dst_alpha = pixels[index + 3] as f32 / 255.0;
