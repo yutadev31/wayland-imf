@@ -19,7 +19,7 @@ use wayland_protocols_misc::zwp_input_method_v2::client::{
 use crate::state::State;
 
 const PANEL_WIDTH: u32 = 420;
-const PANEL_PADDING: i32 = 12;
+const PANEL_PADDING: i32 = 4;
 const ROW_HEIGHT: i32 = 34;
 const MAX_VISIBLE_CANDIDATES: usize = 8;
 
@@ -110,27 +110,7 @@ impl CandidatePopup {
             0,
             self.width as i32,
             panel_height as i32,
-            [0xF7, 0xF3, 0xEC, 0xF8],
-        );
-        draw_rect(
-            &mut pixels,
-            self.width,
-            self.height,
-            0,
-            0,
-            self.width as i32,
-            1,
-            [0xD2, 0xC6, 0xB6, 0xFF],
-        );
-        draw_rect(
-            &mut pixels,
-            self.width,
-            self.height,
-            0,
-            panel_height as i32 - 1,
-            self.width as i32,
-            1,
-            [0xD2, 0xC6, 0xB6, 0xFF],
+            [0x22, 0x24, 0x33, 0xF8],
         );
 
         for (row, (candidate_index, candidate)) in ctx
@@ -159,9 +139,9 @@ impl CandidatePopup {
 
             let label = format!("{}. {}", candidate_index + 1, candidate);
             let text_color = if selected {
-                [0xFF, 0xFF, 0xFF, 0xFF]
+                [0x3b, 0x3e, 0x57, 0xFF]
             } else {
-                [0x20, 0x20, 0x20, 0xFF]
+                [0xb8, 0xc3, 0xff, 0xFF]
             };
             draw_text(
                 &mut pixels,
