@@ -73,5 +73,5 @@ pub fn handle_key(kb: &mut KbState, key: u32, ime: &mut ImeState) -> bool {
         }
     }
 
-    return false;
+    false
 }

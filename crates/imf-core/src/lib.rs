@@ -30,6 +30,6 @@ pub struct KeyboardInputMethod {}
 
 impl InputMethod for KeyboardInputMethod {
     fn on_input_str(&mut self, _ctx: &mut Context, _text: String) -> bool {
-        return false;
+        false
     }
 }
