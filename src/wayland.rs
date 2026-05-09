@@ -114,8 +114,6 @@ fn handle_key_released(state: &mut State, key: u32) {
 }
 
 fn handle_key_pressed(state: &mut State, key: u32) {
-    println!("key pressed: {}", key);
-
     if !handle_key(&mut state.kb, key, &mut state.ime)
         && let Some(vk) = &state.wayland.virtual_keyboard
     {
