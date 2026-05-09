@@ -26,23 +26,21 @@ fn to_kana(table: &HashMap<&'static str, &'static str>, input: &str) -> String {
         // =========================
         // ① n（ん）処理
         // =========================
-        if chars[i] == 'n' {
-            if i + 1 < chars.len() {
-                let next = chars[i + 1];
+        if chars[i] == 'n' && i + 1 < chars.len() {
+            let next = chars[i + 1];
 
-                // nn → ん
-                if next == 'n' {
-                    result.push('ん');
-                    i += 2;
-                    continue;
-                }
+            // nn → ん
+            if next == 'n' {
+                result.push('ん');
+                i += 2;
+                continue;
+            }
 
-                // n + 子音 → ん
-                if !is_vowel(next) && next != 'y' {
-                    result.push('ん');
-                    i += 1;
-                    continue;
-                }
+            // n + 子音 → ん
+            if !is_vowel(next) && next != 'y' {
+                result.push('ん');
+                i += 1;
+                continue;
             }
         }
 
@@ -187,7 +185,7 @@ impl InputMethod for JapaneseInputMethod {
 
         let buf = to_kana(&self.romaji_table, &buf);
         ctx.set_preedit(buf);
-        return true;
+        true
     }
 
     fn on_update_preedit(&mut self, ctx: &mut Context, text: String) {

@@ -227,6 +227,7 @@ fn load_ui_font() -> Option<FontVec> {
     FontVec::try_from_vec_and_index(bytes, 0).ok()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_rect(
     pixels: &mut [u8],
     width: u32,
@@ -244,6 +245,7 @@ fn draw_rect(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_text(
     pixels: &mut [u8],
     width: u32,

@@ -116,10 +116,10 @@ fn handle_key_released(state: &mut State, key: u32) {
 fn handle_key_pressed(state: &mut State, key: u32) {
     println!("key pressed: {}", key);
 
-    if !handle_key(&mut state.kb, key, &mut state.ime) {
-        if let Some(vk) = &state.wayland.virtual_keyboard {
-            vk.key(0, key, 1);
-        }
+    if !handle_key(&mut state.kb, key, &mut state.ime)
+        && let Some(vk) = &state.wayland.virtual_keyboard
+    {
+        vk.key(0, key, 1);
     }
 
     state.ime.post_update_preedit();

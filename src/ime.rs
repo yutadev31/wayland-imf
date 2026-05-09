@@ -128,7 +128,7 @@ impl ImeState {
                 .context
                 .candidates
                 .get(index)
-                .map(|text| text.clone())
+                .cloned()
                 .unwrap_or(self.context.preedit_buf.clone());
         }
 

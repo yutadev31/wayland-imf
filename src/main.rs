@@ -1,5 +1,5 @@
-use wayland_imf::state::State;
 use wayland_client::Connection;
+use wayland_imf::state::State;
 
 fn main() {
     let conn = Connection::connect_to_env().unwrap();
@@ -8,7 +8,7 @@ fn main() {
     let mut event_queue = conn.new_event_queue();
     let qh = event_queue.handle();
 
-    let mut state = State::new();
+    let mut state = State::default();
     state.ime.init();
 
     let _registry = display.get_registry(&qh, ());
