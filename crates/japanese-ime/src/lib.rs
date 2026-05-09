@@ -150,7 +150,7 @@ fn generate_candidates(text: &str, dict: &HashMap<String, Vec<String>>) -> Vec<S
         result.push(
             text.chars()
                 .filter_map(|ch| {
-                    if ch.is_ascii() {
+                    if ch.is_ascii() || matches!(ch, 'ー' | '〜' | '、' | '。') {
                         Some(ch)
                     } else {
                         char::from_u32((ch as u32) + 0x60)

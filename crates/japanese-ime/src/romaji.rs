@@ -138,5 +138,9 @@ pub fn romaji_table() -> HashMap<&'static str, &'static str> {
         ("lu", "ぅ"),
         ("le", "ぇ"),
         ("lo", "ぉ"),
+        ("-", "ー"),
+        ("~", "〜"),
+        (",", "、"),
+        (".", "。"),
     ])
 }
