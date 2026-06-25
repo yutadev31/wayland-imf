@@ -1,34 +1,140 @@
-use std::os::fd::OwnedFd;
+use std::{
+    fs::{File, OpenOptions},
+    io::Write,
+    os::fd::{AsFd, OwnedFd},
+    path::PathBuf,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use imf_core::KeyAction;
 use xkbcommon::xkb;
 
 use crate::ime::ImeEngine;
 
+#[derive(Debug, Clone, Default)]
+pub struct KeyboardConfig {
+    pub layout: Option<String>,
+}
+
 pub struct KbState {
     pub context: xkb::Context,
     pub keymap: Option<xkb::Keymap>,
     pub state: Option<xkb::State>,
+    pub config: KeyboardConfig,
+}
+
+fn configured_keymap(kb: &KbState) -> Result<Option<xkb::Keymap>, String> {
+    let Some(layout) = kb.config.layout.as_deref() else {
+        return Ok(None);
+    };
+
+    xkb::Keymap::new_from_names(&kb.context, "", "", layout, "", None, xkb::COMPILE_NO_FLAGS)
+        .ok_or_else(|| format!("failed to compile XKB keymap for layout `{layout}`"))
+        .map(Some)
+}
+
+fn apply_keymap(kb: &mut KbState, keymap: xkb::Keymap) {
+    let state = xkb::State::new(&keymap);
+    kb.keymap = Some(keymap);
+    kb.state = Some(state);
+}
+
+fn create_temp_keymap_file(contents: &[u8]) -> std::io::Result<(File, u32)> {
+    let size = contents.len().try_into().unwrap();
+    let base = std::env::temp_dir();
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+
+    for attempt in 0..16 {
+        let path: PathBuf = base.join(format!(
+            "wayland-imf-keymap-{}-{nanos}-{attempt}.xkb",
+            std::process::id()
+        ));
+        let mut file = match OpenOptions::new()
+            .write(true)
+            .read(true)
+            .create_new(true)
+            .open(&path)
+        {
+            Ok(file) => file,
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(err) => return Err(err),
+        };
+        file.write_all(contents)?;
+        file.sync_all()?;
+        let _ = std::fs::remove_file(&path);
+        return Ok((file, size));
+    }
+
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AlreadyExists,
+        "failed to allocate temporary keymap file",
+    ))
+}
+
+pub fn send_virtual_keyboard_keymap(
+    kb: &KbState,
+    vk: &wayland_protocols_misc::zwp_virtual_keyboard_v1::client::zwp_virtual_keyboard_v1::ZwpVirtualKeyboardV1,
+    fd: &impl AsFd,
+    size: u32,
+) {
+    match configured_keymap(kb) {
+        Ok(Some(keymap)) => {
+            let mut keymap_text = keymap.get_as_string(xkb::KEYMAP_FORMAT_TEXT_V1);
+            keymap_text.push('\0');
+            match create_temp_keymap_file(keymap_text.as_bytes()) {
+                Ok((file, size)) => vk.keymap(1, file.as_fd(), size),
+                Err(err) => {
+                    eprintln!("Failed to prepare override keymap file: {err}");
+                    vk.keymap(1, fd.as_fd(), size);
+                }
+            }
+        }
+        Ok(None) => vk.keymap(1, fd.as_fd(), size),
+        Err(err) => {
+            eprintln!("{err}");
+            vk.keymap(1, fd.as_fd(), size);
+        }
+    }
 }
 
 pub fn handle_keymap(fd: OwnedFd, size: u32, kb: &mut KbState) {
-    let context = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
-    let keymap = unsafe {
-        xkb::Keymap::new_from_fd(
-            &context,
-            fd,
-            size.try_into().unwrap(),
-            xkb::KEYMAP_FORMAT_TEXT_V1,
-            xkb::COMPILE_NO_FLAGS,
-        )
-        .expect("Failed to create keymap")
+    match configured_keymap(kb) {
+        Ok(Some(keymap)) => apply_keymap(kb, keymap),
+        Ok(None) => {
+            let keymap = unsafe {
+                xkb::Keymap::new_from_fd(
+                    &kb.context,
+                    fd,
+                    size.try_into().unwrap(),
+                    xkb::KEYMAP_FORMAT_TEXT_V1,
+                    xkb::COMPILE_NO_FLAGS,
+                )
+                .expect("Failed to create keymap")
+            }
+            .unwrap();
+
+            apply_keymap(kb, keymap);
+        }
+        Err(err) => {
+            eprintln!("{err}");
+            let keymap = unsafe {
+                xkb::Keymap::new_from_fd(
+                    &kb.context,
+                    fd,
+                    size.try_into().unwrap(),
+                    xkb::KEYMAP_FORMAT_TEXT_V1,
+                    xkb::COMPILE_NO_FLAGS,
+                )
+                .expect("Failed to create keymap")
+            }
+            .unwrap();
+
+            apply_keymap(kb, keymap);
+        }
     }
-    .unwrap();
-
-    let state = xkb::State::new(&keymap);
-
-    kb.keymap = Some(keymap);
-    kb.state = Some(state);
 }
 
 pub fn handle_modifiers(kb: &mut KbState, depressed: u32, latched: u32, locked: u32, group: u32) {

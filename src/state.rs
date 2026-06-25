@@ -2,11 +2,16 @@ use xkbcommon::xkb;
 
 use crate::{
     ime::ImeEngine,
-    keyboard::KbState,
+    keyboard::{KbState, KeyboardConfig},
     ui::{CandidateViewModel, UiState},
     wayland::WaylandState,
 };
 use wayland_client::QueueHandle;
+
+#[derive(Debug, Clone, Default)]
+pub struct Config {
+    pub keyboard: KeyboardConfig,
+}
 
 pub struct State {
     pub wayland: WaylandState,
@@ -17,13 +22,14 @@ pub struct State {
 }
 
 impl State {
-    pub fn new() -> Self {
+    pub fn new(config: Config) -> Self {
         State {
             wayland: WaylandState::default(),
             kb: KbState {
                 context: xkb::Context::new(xkb::CONTEXT_NO_FLAGS),
                 keymap: None,
                 state: None,
+                config: config.keyboard,
             },
             ime: ImeEngine::default(),
             ui: UiState::default(),
@@ -64,6 +70,6 @@ impl State {
 
 impl Default for State {
     fn default() -> Self {
-        Self::new()
+        Self::new(Config::default())
     }
 }

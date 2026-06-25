@@ -1,5 +1,3 @@
-use std::os::fd::{AsRawFd, BorrowedFd};
-
 use wayland_client::{
     Connection, Dispatch, QueueHandle,
     protocol::{wl_compositor, wl_registry, wl_seat, wl_shm, wl_surface},
@@ -16,7 +14,7 @@ use wayland_protocols_misc::{
 };
 
 use crate::{
-    keyboard::{handle_key, handle_keymap, handle_modifiers},
+    keyboard::{handle_key, handle_keymap, handle_modifiers, send_virtual_keyboard_keymap},
     state::State,
 };
 
@@ -147,7 +145,7 @@ fn handle_keyboard_grab_event(
     match event {
         zwp_input_method_keyboard_grab_v2::Event::Keymap { fd, size, .. } => {
             if let Some(vk) = &state.wayland.virtual_keyboard {
-                vk.keymap(1, unsafe { BorrowedFd::borrow_raw(fd.as_raw_fd()) }, size);
+                send_virtual_keyboard_keymap(&state.kb, vk, &fd, size);
             }
 
             handle_keymap(fd, size, &mut state.kb);
