@@ -1,8 +1,9 @@
 use std::os::fd::OwnedFd;
 
+use imf_core::KeyAction;
 use xkbcommon::xkb;
 
-use crate::ime::ImeState;
+use crate::ime::ImeEngine;
 
 pub struct KbState {
     pub context: xkb::Context,
@@ -36,7 +37,7 @@ pub fn handle_modifiers(kb: &mut KbState, depressed: u32, latched: u32, locked: 
     }
 }
 
-pub fn handle_key(kb: &mut KbState, key: u32, ime: &mut ImeState) -> bool {
+pub fn handle_key(kb: &mut KbState, key: u32, ime: &mut ImeEngine) -> bool {
     if let Some(state) = &kb.state {
         let keycode = xkb::Keycode::new(key + 8);
 
@@ -44,30 +45,31 @@ pub fn handle_key(kb: &mut KbState, key: u32, ime: &mut ImeState) -> bool {
 
         match sym {
             xkb::Keysym::space => {
-                return ime.space();
+                return ime.handle_action(KeyAction::NextCandidate);
             }
             xkb::Keysym::BackSpace => {
-                return ime.backspace();
+                return ime.handle_action(KeyAction::Backspace);
             }
             xkb::Keysym::Return => {
-                return ime.enter();
+                return ime.handle_action(KeyAction::Confirm);
             }
             xkb::Keysym::Escape => {
-                return ime.escape();
+                return ime.handle_action(KeyAction::Cancel);
             }
             xkb::Keysym::Up => {
-                return ime.up();
+                return ime.handle_action(KeyAction::PrevCandidate);
             }
             xkb::Keysym::Down => {
-                return ime.down();
+                return ime.handle_action(KeyAction::NextCandidate);
             }
             xkb::Keysym::Zenkaku_Hankaku => {
                 ime.switch_mode();
+                return true;
             }
             _ => {
                 let text = state.key_get_utf8(keycode);
                 if !text.is_empty() && !text.chars().any(|c| c.is_control()) {
-                    return ime.input_char(text);
+                    return ime.handle_action(KeyAction::Insert(text));
                 }
             }
         }

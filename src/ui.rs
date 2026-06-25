@@ -28,6 +28,25 @@ pub struct UiState {
     pub popup: Option<CandidatePopup>,
 }
 
+pub struct CandidateViewModel {
+    candidates: Vec<String>,
+    selected_index: Option<usize>,
+}
+
+impl CandidateViewModel {
+    pub fn from_context(ctx: &Context) -> Option<Self> {
+        let composition = ctx.composition();
+        if composition.preedit().is_empty() || composition.candidates().is_empty() {
+            return None;
+        }
+
+        Some(Self {
+            candidates: composition.candidates().to_vec(),
+            selected_index: composition.selected_index(),
+        })
+    }
+}
+
 pub struct CandidatePopup {
     surface: wl_surface::WlSurface,
     _popup: zwp_input_popup_surface_v2::ZwpInputPopupSurfaceV2,
@@ -84,20 +103,16 @@ impl CandidatePopup {
         })
     }
 
-    pub fn render(&mut self, ctx: &Context) {
-        let candidate_count = if ctx.preedit_buf.is_empty() {
-            0
-        } else {
-            ctx.candidates.len()
-        };
-
-        if candidate_count == 0 {
+    pub fn render(&mut self, view: Option<&CandidateViewModel>) {
+        let Some(view) = view else {
             self.hide();
             return;
-        }
+        };
+
+        let candidate_count = view.candidates.len();
 
         let visible_count = candidate_count.min(MAX_VISIBLE_CANDIDATES);
-        let start_index = visible_start_index(candidate_count, ctx.selected_index);
+        let start_index = visible_start_index(candidate_count, view.selected_index);
         let panel_height = (PANEL_PADDING * 2 + ROW_HEIGHT * visible_count as i32) as u32;
 
         let mut pixels = vec![0; (self.stride * self.height) as usize];
@@ -113,7 +128,7 @@ impl CandidatePopup {
             [0x22, 0x24, 0x33, 0xF8],
         );
 
-        for (row, (candidate_index, candidate)) in ctx
+        for (row, (candidate_index, candidate)) in view
             .candidates
             .iter()
             .enumerate()
@@ -122,7 +137,7 @@ impl CandidatePopup {
             .enumerate()
         {
             let top = PANEL_PADDING + row as i32 * ROW_HEIGHT;
-            let selected = ctx.selected_index == Some(candidate_index);
+            let selected = view.selected_index == Some(candidate_index);
 
             if selected {
                 draw_rect(

@@ -120,7 +120,6 @@ fn handle_key_pressed(state: &mut State, key: u32) {
         vk.key(0, key, 1);
     }
 
-    state.ime.post_update_preedit();
     state.refresh_candidate_popup();
     sync_input_method(state);
 }
@@ -130,13 +129,12 @@ fn sync_input_method(state: &mut State) {
         return;
     };
 
-    if !state.ime.context.commit_buf.is_empty() {
-        let buf = state.ime.context.commit_buf.clone();
+    let buf = state.ime.context_mut().take_commit_string();
+    if !buf.is_empty() {
         im.commit_string(buf);
-        state.ime.context.commit_buf.clear();
     }
 
-    let preedit = state.ime.get_preedit();
+    let preedit = state.ime.display_preedit().to_string();
     let cursor = preedit.len().try_into().unwrap();
     im.set_preedit_string(preedit, cursor, cursor);
     im.commit(0);

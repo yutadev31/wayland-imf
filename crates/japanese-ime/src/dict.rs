@@ -1,8 +1,13 @@
 use std::{
     collections::HashMap,
     fs::File,
-    io::{BufRead, BufReader},
+    io::{self, BufRead, BufReader},
+    path::Path,
 };
+
+pub trait CandidateProvider {
+    fn candidates_for(&self, text: &str) -> Vec<String>;
+}
 
 fn parse_line(line: &str) -> Option<(String, Vec<String>)> {
     if line.starts_with(";;") || line.trim().is_empty() {
@@ -13,26 +18,44 @@ fn parse_line(line: &str) -> Option<(String, Vec<String>)> {
     let key = parts.next()?.to_string();
     let rest = parts.next()?;
 
-    // /で囲まれた部分を取り出す
-    let candidates: Vec<String> = rest
+    let candidates = rest
         .split('/')
         .filter(|s| !s.is_empty())
-        .map(|s| s.split(';').next().unwrap().to_string()) // 注釈除去
+        .map(|s| s.split(';').next().unwrap_or_default().to_string())
         .collect();
 
     Some((key, candidates))
 }
 
-pub fn load_dict() -> HashMap<String, Vec<String>> {
-    let file = File::open("tmp/SKK-JISYO.L").unwrap();
-    let reader = BufReader::new(file);
+pub struct StaticDictionary {
+    entries: HashMap<String, Vec<String>>,
+}
 
-    let mut dict = HashMap::new();
-    for line in reader.lines() {
-        let line = line.unwrap();
-        if let Some((key, value)) = parse_line(&line) {
-            dict.insert(key, value);
+impl StaticDictionary {
+    pub fn empty() -> Self {
+        Self {
+            entries: HashMap::new(),
         }
     }
-    dict
+
+    pub fn load(path: impl AsRef<Path>) -> io::Result<Self> {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+
+        let mut entries = HashMap::new();
+        for line in reader.lines() {
+            let line = line?;
+            if let Some((key, value)) = parse_line(&line) {
+                entries.insert(key, value);
+            }
+        }
+
+        Ok(Self { entries })
+    }
+}
+
+impl CandidateProvider for StaticDictionary {
+    fn candidates_for(&self, text: &str) -> Vec<String> {
+        self.entries.get(text).cloned().unwrap_or_default()
+    }
 }

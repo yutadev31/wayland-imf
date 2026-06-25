@@ -1,13 +1,18 @@
 use xkbcommon::xkb;
 
-use crate::{ime::ImeState, keyboard::KbState, ui::UiState, wayland::WaylandState};
+use crate::{
+    ime::ImeEngine,
+    keyboard::KbState,
+    ui::{CandidateViewModel, UiState},
+    wayland::WaylandState,
+};
 use wayland_client::QueueHandle;
 
 pub struct State {
     pub wayland: WaylandState,
 
     pub kb: KbState,
-    pub ime: ImeState,
+    pub ime: ImeEngine,
     pub ui: UiState,
 }
 
@@ -20,7 +25,7 @@ impl State {
                 keymap: None,
                 state: None,
             },
-            ime: ImeState::default(),
+            ime: ImeEngine::default(),
             ui: UiState::default(),
         }
     }
@@ -45,7 +50,8 @@ impl State {
 
     pub fn refresh_candidate_popup(&mut self) {
         if let Some(popup) = &mut self.ui.popup {
-            popup.render(&self.ime.context);
+            let view = CandidateViewModel::from_context(self.ime.context());
+            popup.render(view.as_ref());
         }
     }
 

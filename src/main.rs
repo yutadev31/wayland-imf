@@ -9,7 +9,6 @@ fn main() {
     let qh = event_queue.handle();
 
     let mut state = State::default();
-    state.ime.init();
 
     let _registry = display.get_registry(&qh, ());
 
