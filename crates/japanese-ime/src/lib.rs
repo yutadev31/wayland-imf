@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use imf_core::{Context, InputMethod, KeyAction};
+use imf_core::{Candidate, CandidateKind, Context, InputMethod, KeyAction};
 
 use crate::dict::{CandidateProvider, StaticDictionary};
 
@@ -129,6 +129,7 @@ fn katakana(text: &str) -> String {
 pub struct JapaneseInputMethod {
     romaji_table: HashMap<&'static str, &'static str>,
     provider: Box<dyn CandidateProvider>,
+    history: HashMap<String, HashMap<String, u32>>,
 }
 
 impl JapaneseInputMethod {
@@ -136,6 +137,7 @@ impl JapaneseInputMethod {
         Self {
             romaji_table: romaji::romaji_table(),
             provider,
+            history: HashMap::new(),
         }
     }
 
@@ -149,26 +151,59 @@ impl JapaneseInputMethod {
         composition.set_candidates(candidates);
     }
 
-    fn generate_candidates(&self, text: &str) -> Vec<String> {
-        let mut result = self.provider.candidates_for(text);
+    fn generate_candidates(&self, text: &str) -> Vec<Candidate> {
+        let mut result = Vec::new();
+        let mut seen = HashSet::new();
+
+        for candidate in self.provider.candidates_for(text) {
+            if seen.insert(candidate.clone()) {
+                result.push(Candidate::new(candidate, CandidateKind::Conversion, 1000));
+            }
+        }
 
         if let Some((stem, okuri)) = hira_to_okuri(text) {
             let key = format!("{}{}", stem, okuri);
             let suffix = okuri_kana(okuri);
-            result.extend(
-                self.provider
-                    .candidates_for(&key)
-                    .into_iter()
-                    .map(|kanji| format!("{}{}", kanji, suffix)),
-            );
+            for kanji in self.provider.candidates_for(&key) {
+                let candidate = format!("{}{}", kanji, suffix);
+                if seen.insert(candidate.clone()) {
+                    result.push(Candidate::new(candidate, CandidateKind::Conversion, 1100));
+                }
+            }
         }
 
         if !text.is_empty() {
-            result.push(text.to_string());
-            result.push(katakana(text));
+            let hiragana = text.to_string();
+            if seen.insert(hiragana.clone()) {
+                result.push(Candidate::new(hiragana, CandidateKind::Hiragana, -100));
+            }
+
+            let katakana = katakana(text);
+            if seen.insert(katakana.clone()) {
+                result.push(Candidate::new(katakana, CandidateKind::Katakana, -200));
+            }
         }
 
+        let history = self.history.get(text);
+        result.sort_by(|left, right| {
+            let left_history = history
+                .and_then(|entries| entries.get(left.text()))
+                .copied()
+                .unwrap_or(0) as i32;
+            let right_history = history
+                .and_then(|entries| entries.get(right.text()))
+                .copied()
+                .unwrap_or(0) as i32;
+
+            (right.score() + right_history * 100).cmp(&(left.score() + left_history * 100))
+        });
+
         result
+    }
+
+    fn record_selection(&mut self, reading: &str, text: &str) {
+        let entries = self.history.entry(reading.to_string()).or_default();
+        *entries.entry(text.to_string()).or_default() += 1;
     }
 }
 
@@ -210,7 +245,9 @@ impl InputMethod for JapaneseInputMethod {
                     return false;
                 }
 
+                let reading = ctx.composition().preedit().to_string();
                 let text = ctx.composition().display_text().to_string();
+                self.record_selection(&reading, &text);
                 ctx.commit_string(text);
                 ctx.reset_composition();
                 true
@@ -241,6 +278,18 @@ impl InputMethod for JapaneseInputMethod {
                 }
 
                 ctx.composition_mut().select_previous()
+            }
+            KeyAction::SelectCandidate(index) => {
+                if !ctx.is_composing() || !ctx.composition_mut().select_index(index) {
+                    return false;
+                }
+
+                let reading = ctx.composition().preedit().to_string();
+                let text = ctx.composition().display_text().to_string();
+                self.record_selection(&reading, &text);
+                ctx.commit_string(text);
+                ctx.reset_composition();
+                true
             }
         }
     }
@@ -306,6 +355,49 @@ mod tests {
         assert!(ime.handle_action(&mut ctx, KeyAction::Confirm));
 
         assert_eq!(ctx.take_commit_string(), "仮名");
+        assert!(!ctx.is_composing());
+    }
+
+    #[test]
+    fn duplicate_fallback_candidates_are_removed() {
+        let ime = ime_with_entries(&[("かな", &["かな", "カナ", "仮名"])]);
+
+        let candidates = ime.generate_candidates("かな");
+        let texts: Vec<_> = candidates
+            .iter()
+            .map(|candidate| candidate.text())
+            .collect();
+
+        assert_eq!(texts, vec!["かな", "カナ", "仮名"]);
+        assert_eq!(texts.len(), 3);
+    }
+
+    #[test]
+    fn confirmed_candidate_moves_to_front() {
+        let mut ime = ime_with_entries(&[("かな", &["仮名", "佳名"])]);
+        let mut ctx = Context::default();
+
+        for ch in ["k", "a", "n", "a"] {
+            assert!(ime.handle_action(&mut ctx, KeyAction::Insert(ch.to_string())));
+        }
+        assert!(ime.handle_action(&mut ctx, KeyAction::SelectCandidate(1)));
+        assert_eq!(ctx.take_commit_string(), "佳名");
+
+        let candidates = ime.generate_candidates("かな");
+        assert_eq!(candidates[0].text(), "佳名");
+    }
+
+    #[test]
+    fn select_candidate_commits_by_index() {
+        let mut ime = ime_with_entries(&[("かな", &["仮名", "佳名"])]);
+        let mut ctx = Context::default();
+
+        for ch in ["k", "a", "n", "a"] {
+            assert!(ime.handle_action(&mut ctx, KeyAction::Insert(ch.to_string())));
+        }
+
+        assert!(ime.handle_action(&mut ctx, KeyAction::SelectCandidate(1)));
+        assert_eq!(ctx.take_commit_string(), "佳名");
         assert!(!ctx.is_composing());
     }
 

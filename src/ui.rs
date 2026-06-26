@@ -7,7 +7,7 @@ use std::{
 };
 
 use ab_glyph::{Font, FontVec, PxScale, ScaleFont, point};
-use imf_core::Context;
+use imf_core::{Candidate, CandidateKind, Context};
 use wayland_client::{
     Connection, Dispatch, QueueHandle,
     protocol::{wl_buffer, wl_compositor, wl_shm, wl_shm_pool, wl_surface},
@@ -29,7 +29,7 @@ pub struct UiState {
 }
 
 pub struct CandidateViewModel {
-    candidates: Vec<String>,
+    candidates: Vec<Candidate>,
     selected_index: Option<usize>,
 }
 
@@ -152,7 +152,17 @@ impl CandidatePopup {
                 );
             }
 
-            let label = format!("{}. {}", candidate_index + 1, candidate);
+            let kind_label = match candidate.kind() {
+                CandidateKind::Conversion => "変換",
+                CandidateKind::Hiragana => "かな",
+                CandidateKind::Katakana => "カナ",
+            };
+            let label = format!(
+                "{}. [{}] {}",
+                candidate_index + 1,
+                kind_label,
+                candidate.text()
+            );
             let text_color = if selected {
                 [0x3b, 0x3e, 0x57, 0xFF]
             } else {

@@ -1,6 +1,7 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
   };
 
@@ -8,48 +9,53 @@
     {
       self,
       nixpkgs,
+      flake-utils,
       rust-overlay,
     }:
-    let
-      system = "x86_64-linux";
-
-      pkgs = import nixpkgs {
-        inherit system;
-        overlays = [ rust-overlay.overlays.default ];
-      };
-
-      rust = pkgs.rust-bin.stable.latest.default.override {
-        extensions = [ "rust-src" ];
-      };
-
-      nativeBuildInputs = with pkgs; [
-        rust
-        pkg-config
-      ];
-
-      buildInputs = with pkgs; [
-        wayland
-        libxkbcommon
-      ];
-    in
-    {
-      packages.${system}.default = pkgs.rustPlatform.buildRustPackage {
-        pname = "wayland-imf";
-        version = "0.1.0";
-
-        src = ./.;
-
-        cargoLock = {
-          lockFile = ./Cargo.lock;
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ rust-overlay.overlays.default ];
         };
 
-        inherit nativeBuildInputs buildInputs;
-      };
+        rust = pkgs.rust-bin.stable.latest.default.override {
+          extensions = [
+            "rust-src"
+            "rust-analyzer"
+          ];
+        };
 
-      devShells.${system}.default = pkgs.mkShell {
-        inherit nativeBuildInputs buildInputs;
+        nativeBuildInputs = with pkgs; [
+          rust
+          pkg-config
+        ];
 
-        shellHook = "";
-      };
-    };
+        buildInputs = with pkgs; [
+          wayland
+          libxkbcommon
+        ];
+      in
+      {
+        packages.default = pkgs.rustPlatform.buildRustPackage {
+          pname = "wayland-imf";
+          version = "0.1.0";
+
+          src = ./.;
+
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+          };
+
+          inherit nativeBuildInputs buildInputs;
+        };
+
+        devShells.default = pkgs.mkShell {
+          inherit nativeBuildInputs buildInputs;
+
+          shellHook = "";
+        };
+      }
+    );
 }

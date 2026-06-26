@@ -6,13 +6,50 @@ pub enum KeyAction {
     Cancel,
     NextCandidate,
     PrevCandidate,
+    SelectCandidate(usize),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CandidateKind {
+    Conversion,
+    Hiragana,
+    Katakana,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Candidate {
+    text: String,
+    kind: CandidateKind,
+    score: i32,
+}
+
+impl Candidate {
+    pub fn new(text: impl Into<String>, kind: CandidateKind, score: i32) -> Self {
+        Self {
+            text: text.into(),
+            kind,
+            score,
+        }
+    }
+
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    pub fn kind(&self) -> CandidateKind {
+        self.kind
+    }
+
+    pub fn score(&self) -> i32 {
+        self.score
+    }
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct CompositionState {
     raw_input: String,
     preedit: String,
-    candidates: Vec<String>,
+    candidates: Vec<Candidate>,
     selected_index: Option<usize>,
 }
 
@@ -25,7 +62,7 @@ impl CompositionState {
         &self.preedit
     }
 
-    pub fn candidates(&self) -> &[String] {
+    pub fn candidates(&self) -> &[Candidate] {
         &self.candidates
     }
 
@@ -35,7 +72,7 @@ impl CompositionState {
 
     pub fn selected_text(&self) -> Option<&str> {
         self.selected_index
-            .and_then(|index| self.candidates.get(index).map(String::as_str))
+            .and_then(|index| self.candidates.get(index).map(Candidate::text))
     }
 
     pub fn display_text(&self) -> &str {
@@ -53,7 +90,7 @@ impl CompositionState {
         self.preedit = text;
     }
 
-    pub fn set_candidates(&mut self, candidates: Vec<String>) {
+    pub fn set_candidates(&mut self, candidates: Vec<Candidate>) {
         self.candidates = candidates;
         if self
             .selected_index
@@ -65,6 +102,15 @@ impl CompositionState {
 
     pub fn clear_selection(&mut self) {
         self.selected_index = None;
+    }
+
+    pub fn select_index(&mut self, index: usize) -> bool {
+        if index >= self.candidates.len() {
+            return false;
+        }
+
+        self.selected_index = Some(index);
+        true
     }
 
     pub fn select_next(&mut self) -> bool {
@@ -143,7 +189,8 @@ impl InputMethod for KeyboardInputMethod {
             | KeyAction::Confirm
             | KeyAction::Cancel
             | KeyAction::NextCandidate
-            | KeyAction::PrevCandidate => false,
+            | KeyAction::PrevCandidate
+            | KeyAction::SelectCandidate(_) => false,
         }
     }
 }

@@ -172,6 +172,33 @@ pub fn handle_key(kb: &mut KbState, key: u32, ime: &mut ImeEngine) -> bool {
                 ime.switch_mode();
                 return true;
             }
+            xkb::Keysym::_1 => {
+                return ime.handle_action(KeyAction::SelectCandidate(0));
+            }
+            xkb::Keysym::_2 => {
+                return ime.handle_action(KeyAction::SelectCandidate(1));
+            }
+            xkb::Keysym::_3 => {
+                return ime.handle_action(KeyAction::SelectCandidate(2));
+            }
+            xkb::Keysym::_4 => {
+                return ime.handle_action(KeyAction::SelectCandidate(3));
+            }
+            xkb::Keysym::_5 => {
+                return ime.handle_action(KeyAction::SelectCandidate(4));
+            }
+            xkb::Keysym::_6 => {
+                return ime.handle_action(KeyAction::SelectCandidate(5));
+            }
+            xkb::Keysym::_7 => {
+                return ime.handle_action(KeyAction::SelectCandidate(6));
+            }
+            xkb::Keysym::_8 => {
+                return ime.handle_action(KeyAction::SelectCandidate(7));
+            }
+            xkb::Keysym::_9 => {
+                return ime.handle_action(KeyAction::SelectCandidate(8));
+            }
             _ => {
                 let text = state.key_get_utf8(keycode);
                 if !text.is_empty() && !text.chars().any(|c| c.is_control()) {
